@@ -1,0 +1,74 @@
+services:
+  shelfie:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: shelfie
+    depends_on:
+      flaresolverr:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: sqlite:///data/opds.db?mode=rwc
+      BIND_ADDR: 0.0.0.0:7070
+      ARCHIVE_BASE: ${ARCHIVE_URL:-http://localhost:8080}
+      ARCHIVE_NAME: Archive
+      APP_NAME: shelfie
+      METADATA_BASE_URL: https://openlibrary.org
+      FLARESOLVERR_URL: http://flaresolverr:8191
+      FLARESOLVERR_SESSION: shelfie-session
+      RUST_LOG: info,shelfie=debug
+      SEARCH_CACHE_TTL_SECS: 1800
+      BOOK_CACHE_TTL_SECS: 86400
+      LINK_CACHE_TTL_SECS: 86400
+      CACHE_CLEANUP_INTERVAL_SECS: 3600
+      SEARCH_RESULT_LIMIT: 25
+      COVER_LOOKUP_LIMIT: 8
+      INLINE_INFO_CONCURRENCY: 8
+      COVER_LOOKUP_CONCURRENCY: 4
+      UPSTREAM_RETRY_ATTEMPTS: 3
+      UPSTREAM_RETRY_BACKOFF_MS: 250
+    ports:
+      - "7070:7070"
+    networks:
+      - backend
+    volumes:
+      - shelfie_data:/data
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:7070/healthz"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+  flaresolverr:
+    image: ghcr.io/flaresolverr/flaresolverr:latest
+    container_name: flaresolverr
+    environment:
+      LOG_LEVEL: info
+      LOG_HTML: "false"
+      CAPTCHA_SOLVER: none
+      TZ: UTC
+      MAX_CONCURRENT_SESSIONS: 3
+      MAX_PRELAUNCHED_CONTEXTS: 1
+      LAUNCH_OPTIONS: >
+        --disable-gpu
+        --no-sandbox
+        --disable-dev-shm-usage
+    healthcheck:
+      test: ["CMD", "curl", "-fs", "http://127.0.0.1:8191/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    networks:
+      - backend
+    restart: unless-stopped
+    mem_limit: 1G
+
+networks:
+  backend:
+    driver: bridge
+
+volumes:
+  shelfie_data:

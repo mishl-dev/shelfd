@@ -1,0 +1,130 @@
+use std::sync::atomic::Ordering;
+
+use tracing::info;
+
+use crate::db;
+use crate::scraper;
+use crate::state::AppState;
+
+use super::inflight::{InflightRole, begin_inflight};
+use super::retry::{get_flaresolverr_html_with_retry, log_sanitized_html};
+
+pub async fn resolve_download(state: &AppState, md5: &str) -> anyhow::Result<String> {
+    let success_min_cached_at = db::unix_now() - state.link_cache_ttl_secs;
+    let failure_min_cached_at = db::unix_now() - state.link_failure_ttl_secs;
+    if let Some(cached) = db::get_cached_link(
+        &state.pool,
+        md5,
+        success_min_cached_at,
+        failure_min_cached_at,
+    )
+    .await?
+    {
+        if cached.failed {
+            state
+                .metrics
+                .download_failure_cache_hits
+                .fetch_add(1, Ordering::Relaxed);
+            anyhow::bail!(
+                "{}",
+                cached
+                    .failure_reason
+                    .unwrap_or_else(|| "cached download resolution failure".to_owned())
+            );
+        }
+        state
+            .metrics
+            .download_cache_hits
+            .fetch_add(1, Ordering::Relaxed);
+        info!(%md5, media_type = cached.media_type.as_deref().unwrap_or(""), cached_at = cached.cached_at, "download URL cache hit");
+        return cached
+            .download_url
+            .ok_or_else(|| anyhow::anyhow!("cached successful download entry missing URL"));
+    }
+
+    let inflight = begin_inflight(state.download_inflight.clone(), md5.to_owned()).await;
+    let _guard = match inflight {
+        InflightRole::Leader(guard) => guard,
+        InflightRole::Waiter(notify) => {
+            info!(%md5, "waiting for in-flight download resolution");
+            notify.notified().await;
+            if let Some(cached) = db::get_cached_link(
+                &state.pool,
+                md5,
+                success_min_cached_at,
+                failure_min_cached_at,
+            )
+            .await?
+            {
+                if cached.failed {
+                    state
+                        .metrics
+                        .download_failure_cache_hits
+                        .fetch_add(1, Ordering::Relaxed);
+                    anyhow::bail!(
+                        "{}",
+                        cached
+                            .failure_reason
+                            .unwrap_or_else(|| "cached download resolution failure".to_owned())
+                    );
+                }
+                state
+                    .metrics
+                    .download_cache_hits
+                    .fetch_add(1, Ordering::Relaxed);
+                info!(%md5, media_type = cached.media_type.as_deref().unwrap_or(""), cached_at = cached.cached_at, "download URL cache hit after wait");
+                return cached.download_url.ok_or_else(|| {
+                    anyhow::anyhow!("cached successful download entry missing URL")
+                });
+            }
+            begin_inflight(state.download_inflight.clone(), md5.to_owned())
+                .await
+                .into_leader()?
+        }
+    };
+
+    let slow_url = format!("{}/slow_download/{}/0/4", state.archive_base, md5);
+    info!(%md5, %slow_url, "resolving download URL from archive");
+    let html = match get_flaresolverr_html_with_retry(state, &slow_url).await {
+        Ok(html) => html,
+        Err(error) => {
+            db::cache_link_failure(&state.pool, md5, &error.to_string()).await?;
+            return Err(error);
+        }
+    };
+    log_sanitized_html("download page", &html);
+    let download_url = match scraper::parse_download_url(&html) {
+        Ok(url) => url,
+        Err(error) => {
+            db::cache_link_failure(&state.pool, md5, &error.to_string()).await?;
+            return Err(error);
+        }
+    };
+    let media_type = infer_media_type_from_url(&download_url);
+
+    db::cache_link_success(&state.pool, md5, &download_url, media_type.as_deref()).await?;
+    info!(%md5, %download_url, "download URL resolved and cached");
+    Ok(download_url)
+}
+
+pub fn infer_media_type_from_url(url: &str) -> Option<String> {
+    let lowered = url.to_lowercase();
+    let path = lowered.split('?').next().unwrap_or(&lowered);
+    if path.ends_with(".epub") {
+        Some("application/epub+zip".to_owned())
+    } else if path.ends_with(".pdf") {
+        Some("application/pdf".to_owned())
+    } else if path.ends_with(".mobi") {
+        Some("application/x-mobipocket-ebook".to_owned())
+    } else if path.ends_with(".azw3") {
+        Some("application/vnd.amazon.ebook".to_owned())
+    } else if path.ends_with(".fb2") {
+        Some("application/x-fictionbook+xml".to_owned())
+    } else if path.ends_with(".djvu") || path.ends_with(".djv") {
+        Some("image/vnd.djvu".to_owned())
+    } else if path.ends_with(".txt") {
+        Some("text/plain".to_owned())
+    } else {
+        None
+    }
+}
