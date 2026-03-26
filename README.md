@@ -11,11 +11,11 @@ docker compose up --build
 
 Access:
 
-* OPDS server: `http://localhost:7070/opds`
-* OpenSearch: `http://localhost:7070/opds/opensearch.xml`
-* Explore feeds: `http://localhost:7070/opds/explore`
-* Health: `http://localhost:7070/healthz`
-* Metrics: `http://localhost:7070/metrics`
+* OPDS server: `http://localhost:7451/opds`
+* OpenSearch: `http://localhost:7451/opds/opensearch.xml`
+* Explore feeds: `http://localhost:7451/opds/explore`
+* Health: `http://localhost:7451/healthz`
+* Metrics: `http://localhost:7451/metrics`
 
 Stop with:
 

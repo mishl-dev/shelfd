@@ -4,9 +4,9 @@ use anyhow::{Context, Result};
 use axum::Router;
 use dashmap::DashMap;
 use reqwest::Client;
+use sqlx::Executor;
 use sqlx::SqlitePool;
 use sqlx::sqlite::SqlitePoolOptions;
-use sqlx::Executor;
 use tokio::{net::TcpListener, time::Duration};
 use tower_http::trace::TraceLayer;
 use tracing::info;
@@ -22,10 +22,13 @@ mod service;
 mod state;
 
 use clap::Parser;
-use config::{Cli, Command, ServeArgs, load_config, init_tracing, print_startup_summary, parse_explore_subjects};
+use config::{
+    Cli, Command, ServeArgs, init_tracing, load_config, parse_explore_subjects,
+    print_startup_summary,
+};
 use flaresolverr::FlareSolverrClient;
 use models::CacheTtls;
-use state::{AppState, AppMetrics};
+use state::{AppMetrics, AppState};
 
 use http::cover::handle_cover;
 use http::download::handle_download;
@@ -236,7 +239,7 @@ mod tests {
             archive_name: "Archive".to_owned(),
             app_name: "shelfie".to_owned(),
             metadata_base_url: "https://openlibrary.org".to_owned(),
-            public_base_url: Some("http://localhost:7070".to_owned()),
+            public_base_url: Some("http://localhost:7451".to_owned()),
             search_cache_ttl_secs: 1800,
             book_cache_ttl_secs: 86400,
             link_cache_ttl_secs: 86400,
@@ -252,8 +255,10 @@ mod tests {
             upstream_retry_backoff_ms: 250,
             explore_subjects: Arc::new(parse_explore_subjects("science_fiction,fantasy")),
             subject_name_by_slug: Arc::new(
-                [("science_fiction".to_owned(), "Science Fiction".to_owned()),
-                 ("fantasy".to_owned(), "Fantasy".to_owned())]
+                [
+                    ("science_fiction".to_owned(), "Science Fiction".to_owned()),
+                    ("fantasy".to_owned(), "Fantasy".to_owned()),
+                ]
                 .into_iter()
                 .collect(),
             ),
@@ -420,8 +425,17 @@ mod tests {
 
     #[test]
     fn retry_backoff_grows_exponentially() {
-        assert_eq!(retry_backoff(250, 1), tokio::time::Duration::from_millis(250));
-        assert_eq!(retry_backoff(250, 2), tokio::time::Duration::from_millis(500));
-        assert_eq!(retry_backoff(250, 3), tokio::time::Duration::from_millis(1000));
+        assert_eq!(
+            retry_backoff(250, 1),
+            tokio::time::Duration::from_millis(250)
+        );
+        assert_eq!(
+            retry_backoff(250, 2),
+            tokio::time::Duration::from_millis(500)
+        );
+        assert_eq!(
+            retry_backoff(250, 3),
+            tokio::time::Duration::from_millis(1000)
+        );
     }
 }

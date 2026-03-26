@@ -35,11 +35,10 @@ pub async fn handle_cover(
     } else {
         let min_cached_at = db::unix_now() - state.book_cache_ttl_secs;
 
-        let mut cover_url =
-            match db::get_cached_book(&state.pool, &param, min_cached_at).await {
-                Ok(Some(cached)) => cached.entry.cover_url,
-                _ => None,
-            };
+        let mut cover_url = match db::get_cached_book(&state.pool, &param, min_cached_at).await {
+            Ok(Some(cached)) => cached.entry.cover_url,
+            _ => None,
+        };
 
         if cover_url.is_none() {
             let min_cover_checked_at = db::unix_now() - state.cover_negative_ttl_secs;

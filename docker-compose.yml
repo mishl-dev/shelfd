@@ -9,7 +9,7 @@ services:
         condition: service_healthy
     environment:
       DATABASE_URL: sqlite:///data/opds.db?mode=rwc
-      BIND_ADDR: 0.0.0.0:7070
+      BIND_ADDR: 0.0.0.0:7451
       ARCHIVE_BASE: ${ARCHIVE_URL:-http://localhost:8080}
       ARCHIVE_NAME: Archive
       APP_NAME: shelfie
@@ -28,17 +28,12 @@ services:
       UPSTREAM_RETRY_ATTEMPTS: 3
       UPSTREAM_RETRY_BACKOFF_MS: 250
     ports:
-      - "7070:7070"
+      - "7451:7451"
     networks:
       - backend
     volumes:
       - shelfie_data:/data
-    healthcheck:
-      test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:7070/healthz"]
-      interval: 15s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
+    # Healthcheck omitted — distroless image has no shell or wget/curl
     restart: unless-stopped
 
   flaresolverr:
@@ -49,12 +44,19 @@ services:
       LOG_HTML: "false"
       CAPTCHA_SOLVER: none
       TZ: UTC
-      MAX_CONCURRENT_SESSIONS: 3
+      MAX_CONCURRENT_SESSIONS: 1
       MAX_PRELAUNCHED_CONTEXTS: 1
+      # --single-process trades process isolation for lower memory usage
       LAUNCH_OPTIONS: >
         --disable-gpu
         --no-sandbox
         --disable-dev-shm-usage
+        --single-process
+        --disable-extensions
+        --disable-background-networking
+        --disable-sync
+        --no-zygote
+  
     healthcheck:
       test: ["CMD", "curl", "-fs", "http://127.0.0.1:8191/health"]
       interval: 15s
@@ -64,7 +66,7 @@ services:
     networks:
       - backend
     restart: unless-stopped
-    mem_limit: 1G
+    mem_limit: 512m
 
 networks:
   backend:

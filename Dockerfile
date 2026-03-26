@@ -8,24 +8,19 @@ RUN cargo chef prepare --recipe-path recipe.json
 
 FROM chef AS builder
 COPY --from=planner /app/recipe.json recipe.json
-# Deps layer — only busts when Cargo.toml/Cargo.lock change
 RUN cargo chef cook --release --recipe-path recipe.json
 COPY . .
 RUN cargo build --release
+RUN mkdir -p /data
 
-FROM debian:bookworm-slim
+FROM gcr.io/distroless/cc
 
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates wget \
-    && rm -rf /var/lib/apt/lists/*
-
+COPY --from=builder /data /data
 COPY --from=builder /app/target/release/shelfie /usr/local/bin/shelfie
 
 ENV DATABASE_URL=sqlite:///data/opds.db?mode=rwc
-ENV BIND_ADDR=0.0.0.0:7070
+ENV BIND_ADDR=0.0.0.0:7451
 
-RUN mkdir -p /data
+EXPOSE 7451
 
-EXPOSE 7070
-
-CMD ["shelfie"]
+CMD ["/usr/local/bin/shelfie"]

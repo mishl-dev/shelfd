@@ -31,10 +31,7 @@ impl Drop for InflightGuard {
     }
 }
 
-pub async fn begin_inflight(
-    map: Arc<DashMap<String, Arc<Notify>>>,
-    key: String,
-) -> InflightRole {
+pub async fn begin_inflight(map: Arc<DashMap<String, Arc<Notify>>>, key: String) -> InflightRole {
     if let Some(existing) = map.get(&key) {
         return InflightRole::Waiter(existing.clone());
     }

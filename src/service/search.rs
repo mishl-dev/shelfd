@@ -19,9 +19,7 @@ pub async fn do_search(state: &AppState, query: &str, page: usize) -> anyhow::Re
     let page = page.max(1);
     let cache_key = search_cache_key(&normalized_query, page);
     let search_cache_cutoff = db::unix_now() - state.search_cache_ttl_secs;
-    if let Some(xml) =
-        db::get_cached_search(&state.pool, &cache_key, search_cache_cutoff).await?
-    {
+    if let Some(xml) = db::get_cached_search(&state.pool, &cache_key, search_cache_cutoff).await? {
         state
             .metrics
             .search_cache_hits
@@ -183,12 +181,22 @@ pub fn sort_books_for_query(query: &str, books: &mut [BookEntry]) {
     books.sort_unstable_by(|a, b| {
         b.downloads
             .cmp(&a.downloads)
-            .then_with(|| book_rank_key(&normalized_query, &terms, b).cmp(&book_rank_key(&normalized_query, &terms, a)))
+            .then_with(|| {
+                book_rank_key(&normalized_query, &terms, b).cmp(&book_rank_key(
+                    &normalized_query,
+                    &terms,
+                    a,
+                ))
+            })
             .then_with(|| a.title.cmp(&b.title))
     });
 }
 
-fn book_rank_key(normalized_query: &str, query_terms: &[String], book: &BookEntry) -> (i32, i32, i32, i32) {
+fn book_rank_key(
+    normalized_query: &str,
+    query_terms: &[String],
+    book: &BookEntry,
+) -> (i32, i32, i32, i32) {
     let normalized_title = fold_text(&book.title);
     let normalized_author = fold_text(&book.author);
 

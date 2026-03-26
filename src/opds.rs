@@ -10,8 +10,8 @@ use quick_xml::{
 use std::io::Cursor;
 
 use crate::{
-    state::AppState,
     models::{BookEntry, ExploreEntry},
+    state::AppState,
 };
 
 const ATOM_NS: &str = "http://www.w3.org/2005/Atom";
@@ -73,7 +73,10 @@ pub fn search_feed(
 
     start_feed(
         &mut w,
-        &format!("urn:{app_name}:search:{}:page:{page}", urlencoding::encode(query)),
+        &format!(
+            "urn:{app_name}:search:{}:page:{page}",
+            urlencoding::encode(query)
+        ),
     );
     text_elem(&mut w, "title", &format!("Search: {query}"));
     text_elem(&mut w, "updated", &now_rfc3339());
@@ -129,7 +132,10 @@ pub fn search_feed(
         &mut w,
         "opensearch:startIndex",
         &[],
-        &page.saturating_sub(1).saturating_mul(books.len().max(1)).to_string(),
+        &page
+            .saturating_sub(1)
+            .saturating_mul(books.len().max(1))
+            .to_string(),
     );
 
     for book in books {
@@ -428,10 +434,7 @@ fn entry(
         thumb_tag.push_attribute(("type", "image/jpeg"));
         w.write_event(Event::Empty(thumb_tag)).unwrap();
 
-        let image_url = absolute_url(
-            public_base_url,
-            &format!("/opds/cover/{}", book.md5),
-        );
+        let image_url = absolute_url(public_base_url, &format!("/opds/cover/{}", book.md5));
         let mut tag = BytesStart::new("link");
         tag.push_attribute(("rel", "http://opds-spec.org/image"));
         tag.push_attribute(("href", image_url.as_str()));
@@ -459,10 +462,7 @@ fn entry(
     {
         let mut tag = BytesStart::new("link");
         tag.push_attribute(("rel", "alternate"));
-        tag.push_attribute((
-            "href",
-            format!("{archive_base}/md5/{}", book.md5).as_str(),
-        ));
+        tag.push_attribute(("href", format!("{archive_base}/md5/{}", book.md5).as_str()));
         tag.push_attribute(("type", "text/html"));
         w.write_event(Event::Empty(tag)).unwrap();
     }
@@ -747,7 +747,16 @@ mod tests {
             description: None,
         }];
 
-        let xml = search_feed("example query", &books, 1, false, None, "shelfie", "Archive", "https://example.com");
+        let xml = search_feed(
+            "example query",
+            &books,
+            1,
+            false,
+            None,
+            "shelfie",
+            "Archive",
+            "https://example.com",
+        );
 
         assert!(xml.contains("Search: example query"));
         assert!(xml.contains("urn:md5:abc123"));
@@ -780,7 +789,16 @@ mod tests {
             description: None,
         }];
 
-        let xml = search_feed("dune", &books, 2, true, None, "shelfie", "Archive", "https://example.com");
+        let xml = search_feed(
+            "dune",
+            &books,
+            2,
+            true,
+            None,
+            "shelfie",
+            "Archive",
+            "https://example.com",
+        );
 
         assert!(xml.contains("rel=\"next\""));
         assert!(xml.contains("/opds/search?q=dune&amp;page=3"));
@@ -790,20 +808,17 @@ mod tests {
 
     #[test]
     fn open_search_description_points_to_search_template() {
-        let xml = build_open_search_description(
-            Some("http://localhost:7070"),
-            "shelfie",
-            "Archive",
-        );
+        let xml =
+            build_open_search_description(Some("http://localhost:7451"), "shelfie", "Archive");
 
         assert!(xml.contains("OpenSearchDescription"));
-        assert!(xml.contains("template=\"http://localhost:7070/opds/search?q={searchTerms}\""));
+        assert!(xml.contains("template=\"http://localhost:7451/opds/search?q={searchTerms}\""));
     }
 
     #[test]
     fn explore_root_feed_contains_top_and_subject_links() {
         let xml = explore_root_feed(
-            Some("http://localhost:7070"),
+            Some("http://localhost:7451"),
             &[crate::state::ExploreSubject {
                 slug: "science_fiction".to_owned(),
                 name: "Science Fiction".to_owned(),

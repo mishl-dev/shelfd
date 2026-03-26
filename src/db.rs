@@ -59,7 +59,11 @@ pub async fn run_migrations(pool: &SqlitePool) -> Result<()> {
         "ALTER TABLE books ADD COLUMN cover_checked_at INTEGER",
     )
     .await?;
-    add_column_if_missing(pool, "ALTER TABLE books ADD COLUMN first_publish_year INTEGER").await?;
+    add_column_if_missing(
+        pool,
+        "ALTER TABLE books ADD COLUMN first_publish_year INTEGER",
+    )
+    .await?;
     add_column_if_missing(pool, "ALTER TABLE books ADD COLUMN language TEXT").await?;
     add_column_if_missing(pool, "ALTER TABLE books ADD COLUMN subjects_json TEXT").await?;
     add_column_if_missing(pool, "ALTER TABLE books ADD COLUMN description TEXT").await?;

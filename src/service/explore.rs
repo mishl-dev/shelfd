@@ -11,10 +11,7 @@ use crate::state::AppState;
 use super::retry::get_json_with_retry;
 
 pub fn explore_subject_name<'a>(state: &'a AppState, subject: &str) -> Option<&'a str> {
-    state
-        .subject_name_by_slug
-        .get(subject)
-        .map(|s| s.as_str())
+    state.subject_name_by_slug.get(subject).map(|s| s.as_str())
 }
 
 pub async fn fetch_top_explore_entries(state: &AppState) -> anyhow::Result<Vec<ExploreEntry>> {
@@ -67,8 +64,7 @@ pub async fn fetch_subject_entries(
         "{}/subjects/{subject}.json?limit={limit}&details=false",
         state.metadata_base_url
     );
-    let body =
-        get_json_with_retry::<OlSubjectResponse>(state, &url, "metadata subjects").await?;
+    let body = get_json_with_retry::<OlSubjectResponse>(state, &url, "metadata subjects").await?;
     let entries: Vec<_> = body
         .works
         .into_iter()

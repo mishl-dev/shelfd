@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 // Use the external `scraper` crate via its full path to avoid name clash with this module.
 use scraper::{Html, Selector};
 

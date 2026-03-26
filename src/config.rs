@@ -67,7 +67,7 @@ pub struct ServeArgs {
     /// Override the SQLite database URL.
     #[arg(long, env = "DATABASE_URL")]
     pub database_url: Option<String>,
-    /// Override the bind address, for example 0.0.0.0:7070.
+    /// Override the bind address, for example 0.0.0.0:7451.
     #[arg(long, env = "BIND_ADDR")]
     pub bind_addr: Option<String>,
     /// Override the archive base URL.
