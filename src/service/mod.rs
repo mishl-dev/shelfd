@@ -1,4 +1,5 @@
 pub mod cleanup;
+pub mod cover;
 pub mod download;
 pub mod explore;
 pub mod inflight;

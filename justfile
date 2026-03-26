@@ -52,7 +52,7 @@ fmt:
 
 # Run linter
 lint:
-    cargo clippy -- -D warnings
+    cargo clippy --all-targets --all-features -- -D warnings
 
 # Format and lint
 check: fmt lint

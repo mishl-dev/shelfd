@@ -33,6 +33,7 @@ pub struct AppState {
     pub inline_info_concurrency: usize,
     #[allow(dead_code)]
     pub cover_lookup_concurrency: usize,
+    pub search_prewarm_count: usize,
     pub upstream_retry_attempts: usize,
     pub upstream_retry_backoff_ms: u64,
     pub explore_subjects: Arc<Vec<ExploreSubject>>,
@@ -41,6 +42,7 @@ pub struct AppState {
     pub search_inflight: Arc<DashMap<String, Arc<Notify>>>,
     pub download_inflight: Arc<DashMap<String, Arc<Notify>>>,
     pub cover_inflight: Arc<DashMap<String, Arc<Notify>>>,
+    pub hot_cover_resolutions: Arc<DashMap<String, HotCoverResolution>>,
 }
 
 #[derive(Default)]
@@ -48,10 +50,23 @@ pub struct AppMetrics {
     pub requests_total: AtomicU64,
     pub searches_total: AtomicU64,
     pub search_cache_hits: AtomicU64,
+    pub search_result_books_seen: AtomicU64,
+    pub search_book_cache_hits: AtomicU64,
+    pub search_book_cache_misses: AtomicU64,
+    pub search_inline_info_requests: AtomicU64,
+    pub search_inline_info_failures: AtomicU64,
     pub explore_cache_hits: AtomicU64,
     pub downloads_total: AtomicU64,
     pub download_cache_hits: AtomicU64,
     pub download_failure_cache_hits: AtomicU64,
+    pub flaresolverr_solves_started: AtomicU64,
+    pub flaresolverr_solves_completed: AtomicU64,
+    pub cover_prewarm_jobs_started: AtomicU64,
+    pub cover_prewarm_jobs_completed: AtomicU64,
+    pub cover_prewarm_attempts: AtomicU64,
+    pub cover_prewarm_hits: AtomicU64,
+    pub cover_resolution_hot_hits: AtomicU64,
+    pub cover_resolution_hot_misses: AtomicU64,
     pub upstream_retries: AtomicU64,
     pub cover_jobs_started: AtomicU64,
     pub cover_jobs_completed: AtomicU64,
@@ -62,4 +77,10 @@ pub struct AppMetrics {
 pub struct ExploreSubject {
     pub slug: String,
     pub name: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct HotCoverResolution {
+    pub cover_url: Option<String>,
+    pub cached_at: i64,
 }

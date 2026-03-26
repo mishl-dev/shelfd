@@ -23,9 +23,16 @@ pub async fn handle_explore_root(State(state): State<AppState>) -> Response {
 
     state.metrics.requests_total.fetch_add(1, Ordering::Relaxed);
     (
-        [(header::CONTENT_TYPE, "application/atom+xml; charset=utf-8")],
+        [
+            (header::CONTENT_TYPE, "application/atom+xml; charset=utf-8"),
+            (
+                header::CACHE_CONTROL,
+                "public, max-age=1800, stale-while-revalidate=21600",
+            ),
+        ],
         opds::explore_root_feed(
             state.public_base_url.as_deref(),
+            "/opds/explore",
             state.explore_subjects.as_slice(),
             &state.app_name,
             &state.archive_name,
@@ -46,7 +53,13 @@ pub async fn handle_explore_top(
         Ok(entries) => {
             let page_entries = paginate_entries(&entries, page, state.explore_page_size);
             (
-                [(header::CONTENT_TYPE, "application/atom+xml; charset=utf-8")],
+                [
+                    (header::CONTENT_TYPE, "application/atom+xml; charset=utf-8"),
+                    (
+                        header::CACHE_CONTROL,
+                        "public, max-age=1800, stale-while-revalidate=21600",
+                    ),
+                ],
                 opds::explore_feed(
                     "Popular Top 250",
                     &format!("urn:{}:explore:top", state.app_name),
@@ -88,7 +101,13 @@ pub async fn handle_explore_subject(
         Ok(entries) => {
             let page_entries = paginate_entries(&entries, page, state.explore_page_size);
             (
-                [(header::CONTENT_TYPE, "application/atom+xml; charset=utf-8")],
+                [
+                    (header::CONTENT_TYPE, "application/atom+xml; charset=utf-8"),
+                    (
+                        header::CACHE_CONTROL,
+                        "public, max-age=1800, stale-while-revalidate=21600",
+                    ),
+                ],
                 opds::explore_feed(
                     &format!("Explore: {subject_name}"),
                     &format!("urn:{}:explore:subject:{subject}", state.app_name),

@@ -1,7 +1,7 @@
 use tracing::{debug, instrument, warn};
 
 use crate::db;
-use crate::models::{BookEntry, OlEnrichment, OlResponse};
+use crate::models::{BookEntry, OlDoc, OlEnrichment, OlResponse};
 use crate::state::AppState;
 
 use super::retry::get_json_with_retry;
@@ -33,10 +33,11 @@ pub async fn enrich_book_metadata(state: &AppState, md5: &str) -> Option<String>
 #[instrument(skip(state, book), fields(title = %book.title, author = %book.author))]
 async fn fetch_ol_metadata(state: &AppState, book: &BookEntry) -> OlEnrichment {
     let url = format!(
-        "{}/search.json?title={}&author={}&limit=1",
+        "{}/search.json?title={}&author={}&limit={}&fields=cover_i,cover_edition_key,subject,first_publish_year,language,editions,editions.key,editions.cover_i",
         state.metadata_base_url,
         urlencoding::encode(&book.title),
         urlencoding::encode(&book.author),
+        state.cover_lookup_limit.max(1),
     );
     debug!(title = %book.title, author = %book.author, "querying metadata provider");
     match get_json_with_retry::<OlResponse>(state, &url, "metadata lookup").await {
@@ -44,11 +45,10 @@ async fn fetch_ol_metadata(state: &AppState, book: &BookEntry) -> OlEnrichment {
             let Some(doc) = body.docs.first() else {
                 return OlEnrichment::default();
             };
-            let cover_url = doc.cover_i.map(|cover_i| {
-                let url = format!("https://covers.openlibrary.org/b/id/{cover_i}-M.jpg");
+            let cover_url = select_cover_url(&body.docs);
+            if let Some(url) = cover_url.as_deref() {
                 debug!(title = %book.title, %url, "cover found");
-                url
-            });
+            }
             let language = doc
                 .language
                 .as_ref()
@@ -76,5 +76,116 @@ async fn fetch_ol_metadata(state: &AppState, book: &BookEntry) -> OlEnrichment {
             warn!(title = %book.title, error = %error, "failed to fetch Open Library response");
             OlEnrichment::default()
         }
+    }
+}
+
+fn select_cover_url(docs: &[OlDoc]) -> Option<String> {
+    docs.iter().find_map(cover_url_for_doc)
+}
+
+fn cover_url_for_doc(doc: &OlDoc) -> Option<String> {
+    if let Some(cover_i) = doc.cover_i {
+        return Some(format!("https://covers.openlibrary.org/b/id/{cover_i}-M.jpg"));
+    }
+
+    if let Some(cover_edition_key) = doc.cover_edition_key.as_deref() {
+        return Some(format!(
+            "https://covers.openlibrary.org/b/olid/{cover_edition_key}-M.jpg"
+        ));
+    }
+
+    doc.editions.as_ref().and_then(|editions| {
+        editions.docs.iter().find_map(|edition| {
+            edition
+                .cover_i
+                .map(|cover_i| format!("https://covers.openlibrary.org/b/id/{cover_i}-M.jpg"))
+                .or_else(|| {
+                    edition.key.as_deref().map(|key| {
+                        let olid = key.trim_start_matches("/books/");
+                        format!("https://covers.openlibrary.org/b/olid/{olid}-M.jpg")
+                    })
+                })
+        })
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn selects_first_work_level_cover() {
+        let body: OlResponse = serde_json::from_str(
+            r#"{
+                "docs": [
+                    { "cover_i": 12345, "first_publish_year": 1965 },
+                    { "cover_i": 99999 }
+                ]
+            }"#,
+        )
+        .unwrap();
+
+        assert_eq!(
+            select_cover_url(&body.docs).as_deref(),
+            Some("https://covers.openlibrary.org/b/id/12345-M.jpg")
+        );
+    }
+
+    #[test]
+    fn falls_back_to_later_doc_with_cover() {
+        let body: OlResponse = serde_json::from_str(
+            r#"{
+                "docs": [
+                    { "first_publish_year": 1965 },
+                    { "cover_i": 67890 }
+                ]
+            }"#,
+        )
+        .unwrap();
+
+        assert_eq!(
+            select_cover_url(&body.docs).as_deref(),
+            Some("https://covers.openlibrary.org/b/id/67890-M.jpg")
+        );
+    }
+
+    #[test]
+    fn falls_back_to_edition_level_cover_data() {
+        let body: OlResponse = serde_json::from_str(
+            r#"{
+                "docs": [
+                    {
+                        "editions": {
+                            "docs": [
+                                { "key": "/books/OL123M", "cover_i": 24680 }
+                            ]
+                        }
+                    }
+                ]
+            }"#,
+        )
+        .unwrap();
+
+        assert_eq!(
+            select_cover_url(&body.docs).as_deref(),
+            Some("https://covers.openlibrary.org/b/id/24680-M.jpg")
+        );
+    }
+
+    #[test]
+    fn falls_back_to_cover_edition_key() {
+        let body: OlResponse = serde_json::from_str(
+            r#"{
+                "docs": [
+                    { "cover_edition_key": "OL999M" }
+                ]
+            }"#,
+        )
+        .unwrap();
+
+        assert_eq!(
+            select_cover_url(&body.docs).as_deref(),
+            Some("https://covers.openlibrary.org/b/olid/OL999M-M.jpg")
+        );
     }
 }

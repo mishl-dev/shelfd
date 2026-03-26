@@ -1,16 +1,11 @@
 use std::sync::Arc;
 
-use anyhow::{Context, Result};
-use axum::Router;
+use anyhow::Result;
 use dashmap::DashMap;
-use reqwest::Client;
-use sqlx::Executor;
-use sqlx::SqlitePool;
-use sqlx::sqlite::SqlitePoolOptions;
-use tokio::{net::TcpListener, time::Duration};
-use tower_http::trace::TraceLayer;
+use tokio::net::TcpListener;
 use tracing::info;
 
+mod app;
 mod config;
 mod cover_gen;
 mod db;
@@ -23,6 +18,7 @@ mod service;
 mod state;
 
 use clap::Parser;
+use app::{build_app, build_http_client, build_sqlite_pool};
 use config::{
     Cli, Command, ServeArgs, init_tracing, load_config, parse_explore_subjects,
     print_startup_summary,
@@ -30,13 +26,6 @@ use config::{
 use flaresolverr::FlareSolverrClient;
 use models::CacheTtls;
 use state::{AppMetrics, AppState};
-
-use http::cover::handle_cover;
-use http::download::handle_download;
-use http::explore::{handle_explore_root, handle_explore_subject, handle_explore_top};
-use http::health::{handle_health, handle_ready};
-use http::metrics::handle_metrics;
-use http::search::handle_search;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -91,6 +80,7 @@ async fn main() -> Result<()> {
         cover_lookup_limit: config.cover_lookup_limit,
         inline_info_concurrency: config.inline_info_concurrency,
         cover_lookup_concurrency: config.cover_lookup_concurrency,
+        search_prewarm_count: config.search_prewarm_count,
         upstream_retry_attempts: config.upstream_retry_attempts,
         upstream_retry_backoff_ms: config.upstream_retry_backoff_ms,
         explore_subjects,
@@ -99,6 +89,7 @@ async fn main() -> Result<()> {
         search_inflight: Arc::new(DashMap::new()),
         download_inflight: Arc::new(DashMap::new()),
         cover_inflight: Arc::new(DashMap::new()),
+        hot_cover_resolutions: Arc::new(DashMap::new()),
     };
 
     let cache_ttls = CacheTtls {
@@ -139,6 +130,7 @@ async fn main() -> Result<()> {
         cover_lookup_limit = config.cover_lookup_limit,
         inline_info_concurrency = config.inline_info_concurrency,
         cover_lookup_concurrency = config.cover_lookup_concurrency,
+        search_prewarm_count = config.search_prewarm_count,
         upstream_retry_attempts = config.upstream_retry_attempts,
         upstream_retry_backoff_ms = config.upstream_retry_backoff_ms,
         explore_subject_count = state.explore_subjects.len(),
@@ -154,61 +146,13 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-pub fn build_http_client() -> Result<Client> {
-    Client::builder()
-        .user_agent(concat!("shelfie/", env!("CARGO_PKG_VERSION")))
-        .connect_timeout(Duration::from_secs(5))
-        .timeout(Duration::from_secs(300))
-        .pool_idle_timeout(Duration::from_secs(90))
-        .pool_max_idle_per_host(16)
-        .tcp_keepalive(Duration::from_secs(60))
-        .build()
-        .context("failed to build shared reqwest client")
-}
-
-async fn build_sqlite_pool(database_url: &str) -> Result<SqlitePool> {
-    let pool = SqlitePoolOptions::new()
-        .max_connections(16)
-        .connect(database_url)
-        .await?;
-
-    pool.execute("PRAGMA journal_mode = WAL").await?;
-    pool.execute("PRAGMA synchronous = NORMAL").await?;
-    pool.execute("PRAGMA busy_timeout = 5000").await?;
-    pool.execute("PRAGMA temp_store = MEMORY").await?;
-
-    Ok(pool)
-}
-
-fn build_app(state: AppState) -> Router {
-    Router::new()
-        .route("/healthz", get(handle_health))
-        .route("/readyz", get(handle_ready))
-        .route("/metrics", get(handle_metrics))
-        .route("/opds", get(opds::root_feed))
-        .route("/opds/explore", get(handle_explore_root))
-        .route("/opds/explore/top", get(handle_explore_top))
-        .route(
-            "/opds/explore/subject/{subject}",
-            get(handle_explore_subject),
-        )
-        .route("/opds/opensearch.xml", get(opds::open_search))
-        .route("/opds/search", get(handle_search))
-        .route("/opds/cover/{md5}", get(handle_cover))
-        .route("/opds/download/{md5}", get(handle_download))
-        .layer(TraceLayer::new_for_http())
-        .with_state(state)
-}
-
-// Re-export for test access
-use axum::routing::get;
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use axum::{
         body::{Body, to_bytes},
         http::{Request, StatusCode, header},
+        Router,
     };
     use sqlx::sqlite::SqlitePoolOptions;
     use tower::util::ServiceExt;
@@ -247,13 +191,14 @@ mod tests {
             link_failure_ttl_secs: 900,
             explore_cache_ttl_secs: 21_600,
             cover_negative_ttl_secs: 86_400,
-            search_result_limit: 25,
+            search_result_limit: 12,
             explore_page_size: 50,
             cover_lookup_limit: 8,
-            inline_info_concurrency: 8,
+            inline_info_concurrency: 6,
             cover_lookup_concurrency: 4,
-            upstream_retry_attempts: 3,
-            upstream_retry_backoff_ms: 250,
+            search_prewarm_count: 3,
+            upstream_retry_attempts: 2,
+            upstream_retry_backoff_ms: 150,
             explore_subjects: Arc::new(parse_explore_subjects("science_fiction,fantasy")),
             subject_name_by_slug: Arc::new(
                 [
@@ -267,6 +212,7 @@ mod tests {
             search_inflight: Arc::new(DashMap::new()),
             download_inflight: Arc::new(DashMap::new()),
             cover_inflight: Arc::new(DashMap::new()),
+            hot_cover_resolutions: Arc::new(DashMap::new()),
         };
 
         build_app(state)

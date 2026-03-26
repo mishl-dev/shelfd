@@ -19,7 +19,17 @@ pub async fn handle_download(State(state): State<AppState>, Path(md5): Path<Stri
         .downloads_total
         .fetch_add(1, Ordering::Relaxed);
     match resolve_download(&state, &md5).await {
-        Ok(url) => (StatusCode::FOUND, [(header::LOCATION, url)]).into_response(),
+        Ok(url) => (
+            StatusCode::FOUND,
+            [
+                (header::LOCATION, url),
+                (
+                    header::CACHE_CONTROL,
+                    "private, max-age=300, stale-while-revalidate=900".to_owned(),
+                ),
+            ],
+        )
+            .into_response(),
         Err(e) => {
             tracing::error!("download resolve failed: {e:#}");
             (StatusCode::BAD_GATEWAY, e.to_string()).into_response()

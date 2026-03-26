@@ -84,6 +84,10 @@ pub async fn resolve_download(state: &AppState, md5: &str) -> anyhow::Result<Str
     };
 
     let slow_url = format!("{}/slow_download/{}/0/4", state.archive_base, md5);
+    state
+        .metrics
+        .flaresolverr_solves_started
+        .fetch_add(1, Ordering::Relaxed);
     info!(%md5, %slow_url, "resolving download URL from archive");
     let html = match get_flaresolverr_html_with_retry(state, &slow_url).await {
         Ok(html) => html,
@@ -103,6 +107,10 @@ pub async fn resolve_download(state: &AppState, md5: &str) -> anyhow::Result<Str
     let media_type = infer_media_type_from_url(&download_url);
 
     db::cache_link_success(&state.pool, md5, &download_url, media_type.as_deref()).await?;
+    state
+        .metrics
+        .flaresolverr_solves_completed
+        .fetch_add(1, Ordering::Relaxed);
     info!(%md5, %download_url, "download URL resolved and cached");
     Ok(download_url)
 }

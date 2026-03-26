@@ -28,7 +28,13 @@ pub async fn handle_search(
     let page = params.page.unwrap_or(1).max(1);
     match do_search(&state, &params.q, page).await {
         Ok(xml) => (
-            [(header::CONTENT_TYPE, "application/atom+xml; charset=utf-8")],
+            [
+                (header::CONTENT_TYPE, "application/atom+xml; charset=utf-8"),
+                (
+                    header::CACHE_CONTROL,
+                    "public, max-age=300, stale-while-revalidate=1800",
+                ),
+            ],
             xml,
         )
             .into_response(),

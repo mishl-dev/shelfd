@@ -1,3 +1,4 @@
+use std::collections::{HashMap, HashSet};
 use std::sync::atomic::Ordering;
 
 use futures::stream::{self, StreamExt};
@@ -8,6 +9,7 @@ use crate::state::AppState;
 use crate::{db, opds, scraper};
 
 use super::inflight::{InflightRole, begin_inflight};
+use super::metadata::enrich_book_metadata;
 use super::retry::{get_json_with_retry, get_text_with_retry, log_sanitized_html};
 
 struct ResolvedBook {
@@ -81,6 +83,10 @@ pub async fn do_search(state: &AppState, query: &str, page: usize) -> anyhow::Re
     let mut raw = scraper::parse_search_results(&html);
     let has_more = raw.len() > state.search_result_limit;
     raw.truncate(state.search_result_limit);
+    state
+        .metrics
+        .search_result_books_seen
+        .fetch_add(raw.len() as u64, Ordering::Relaxed);
 
     info!(query = %normalized_query, page, results = raw.len(), has_more, "parsed search results");
 
@@ -89,8 +95,25 @@ pub async fn do_search(state: &AppState, query: &str, page: usize) -> anyhow::Re
         inline_info_concurrency = state.inline_info_concurrency,
         "fetching inline info with bounded concurrency"
     );
+    let raw_md5s: Vec<_> = raw.iter().map(|entry| entry.md5.clone()).collect();
+    let cached_books =
+        db::get_cached_books(&state.pool, &raw_md5s, db::unix_now() - state.book_cache_ttl_secs)
+            .await?;
+    let cached_by_md5: HashMap<_, _> = cached_books
+        .into_iter()
+        .map(|cached| (cached.entry.md5.clone(), cached.entry))
+        .collect();
+    state.metrics.search_book_cache_hits.fetch_add(
+        cached_by_md5.len().min(raw_md5s.len()) as u64,
+        Ordering::Relaxed,
+    );
+    state.metrics.search_book_cache_misses.fetch_add(
+        raw_md5s.len().saturating_sub(cached_by_md5.len()) as u64,
+        Ordering::Relaxed,
+    );
+
     let resolved: Vec<_> = stream::iter(raw.into_iter())
-        .map(|entry| resolve_book_entry(state, entry))
+        .map(|entry| resolve_book_entry(state, entry, &cached_by_md5))
         .buffer_unordered(state.inline_info_concurrency.max(1))
         .collect()
         .await;
@@ -110,6 +133,7 @@ pub async fn do_search(state: &AppState, query: &str, page: usize) -> anyhow::Re
         &state.archive_base,
     );
     db::cache_search(&state.pool, &cache_key, &feed_xml).await?;
+    prewarm_related_assets(state.clone(), books.clone());
     info!(query = %normalized_query, page, books = books.len(), "search flow completed");
 
     Ok(feed_xml)
@@ -123,13 +147,16 @@ fn search_cache_key(query: &str, page: usize) -> String {
     }
 }
 
-#[instrument(skip(state, entry), fields(md5 = %entry.md5, title = %entry.title))]
-async fn resolve_book_entry(state: &AppState, entry: scraper::RawEntry) -> ResolvedBook {
-    let min_cached_at = db::unix_now() - state.book_cache_ttl_secs;
-    if let Ok(Some(cached)) = db::get_cached_book(&state.pool, &entry.md5, min_cached_at).await {
-        debug!(md5 = %entry.md5, cached_at = cached.cached_at, "using cached book metadata");
+#[instrument(skip(state, entry, cached_by_md5), fields(md5 = %entry.md5, title = %entry.title))]
+async fn resolve_book_entry(
+    state: &AppState,
+    entry: scraper::RawEntry,
+    cached_by_md5: &HashMap<String, BookEntry>,
+) -> ResolvedBook {
+    if let Some(cached) = cached_by_md5.get(&entry.md5) {
+        debug!(md5 = %entry.md5, "using cached book metadata");
         return ResolvedBook {
-            entry: cached.entry,
+            entry: cached.clone(),
         };
     }
 
@@ -154,9 +181,54 @@ async fn resolve_book_entry(state: &AppState, entry: scraper::RawEntry) -> Resol
     }
 }
 
+fn prewarm_related_assets(state: AppState, books: Vec<BookEntry>) {
+    let prewarm_count = state.search_prewarm_count;
+    if prewarm_count == 0 {
+        return;
+    }
+    let prewarm_books: Vec<_> = books.into_iter().take(prewarm_count).collect();
+    if prewarm_books.is_empty() {
+        return;
+    }
+
+    tokio::spawn(async move {
+        state
+            .metrics
+            .cover_prewarm_jobs_started
+            .fetch_add(1, Ordering::Relaxed);
+        let mut seen = HashSet::new();
+        for book in prewarm_books {
+            if !seen.insert(book.md5.clone()) {
+                continue;
+            }
+
+            if book.cover_url.is_none() {
+                state
+                    .metrics
+                    .cover_prewarm_attempts
+                    .fetch_add(1, Ordering::Relaxed);
+                if enrich_book_metadata(&state, &book.md5).await.is_some() {
+                    state
+                        .metrics
+                        .cover_prewarm_hits
+                        .fetch_add(1, Ordering::Relaxed);
+                }
+            }
+        }
+        state
+            .metrics
+            .cover_prewarm_jobs_completed
+            .fetch_add(1, Ordering::Relaxed);
+    });
+}
+
 #[instrument(skip(state), fields(url))]
 async fn fetch_downloads(state: &AppState, url: &str) -> i64 {
     use crate::models::InlineInfo;
+    state
+        .metrics
+        .search_inline_info_requests
+        .fetch_add(1, Ordering::Relaxed);
 
     match get_json_with_retry::<InlineInfo>(state, url, "inline info").await {
         Ok(body) => {
@@ -165,6 +237,10 @@ async fn fetch_downloads(state: &AppState, url: &str) -> i64 {
             downloads
         }
         Err(error) => {
+            state
+                .metrics
+                .search_inline_info_failures
+                .fetch_add(1, Ordering::Relaxed);
             warn!(error = %error, "failed to fetch inline info");
             0
         }

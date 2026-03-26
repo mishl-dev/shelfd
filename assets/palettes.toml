@@ -80,15 +80,6 @@ grad_a = "#1a0f0a"
 grad_b = "#3d2515"
 
 [[palette]]
-name = "Sandstone"
-bg = "#F0E6D4"
-fg = "#2C1810"
-acc = "#B85C38"
-muted = "#D4C4A8"
-grad_a = "#f5e6d0"
-grad_b = "#e8d4b8"
-
-[[palette]]
 name = "Deep Sea"
 bg = "#0A1628"
 fg = "#D0E8F0"
@@ -107,16 +98,7 @@ grad_a = "#e0f0f8"
 grad_b = "#c8e0f0"
 
 [[palette]]
-name = "Moss"
-bg = "#0A1A0A"
-fg = "#D8F0D0"
-acc = "#88C070"
-muted = "#1A3A1A"
-grad_a = "#0a1a0a"
-grad_b = "#1a3020"
-
-[[palette]]
-name = "Sage"
+name = "Sage Light"
 bg = "#E8F0E0"
 fg = "#1A2A10"
 acc = "#4A7C59"
@@ -141,33 +123,6 @@ acc = "#E63946"
 muted = "#E8D0C0"
 grad_a = "#fff0e8"
 grad_b = "#ffe0d0"
-
-[[palette]]
-name = "Charcoal"
-bg = "#181818"
-fg = "#F0F0F0"
-acc = "#888888"
-muted = "#333333"
-grad_a = "#181818"
-grad_b = "#2a2a2a"
-
-[[palette]]
-name = "Paper"
-bg = "#F0F0F0"
-fg = "#181818"
-acc = "#555555"
-muted = "#D0D0D0"
-grad_a = "#f0f0f0"
-grad_b = "#e0e0e0"
-
-[[palette]]
-name = "Lagoon"
-bg = "#0A1A1A"
-fg = "#D0F5F0"
-acc = "#2EC4B6"
-muted = "#1A3A38"
-grad_a = "#0a1a1a"
-grad_b = "#153030"
 
 [[palette]]
 name = "Plum"
@@ -197,15 +152,6 @@ grad_a = "#1a1200"
 grad_b = "#3d2a00"
 
 [[palette]]
-name = "Coral"
-bg = "#2A1A1E"
-fg = "#FFE8E4"
-acc = "#FF6B8A"
-muted = "#4A2A30"
-grad_a = "#2a1518"
-grad_b = "#3d2028"
-
-[[palette]]
 name = "Mint"
 bg = "#E8FFF5"
 fg = "#0A2A1A"
@@ -213,15 +159,6 @@ acc = "#10B981"
 muted = "#B0E0D0"
 grad_a = "#e0fff0"
 grad_b = "#c8f0e0"
-
-[[palette]]
-name = "Slate"
-bg = "#1E293B"
-fg = "#F1F5F9"
-acc = "#64748B"
-muted = "#334155"
-grad_a = "#0f172a"
-grad_b = "#1e293b"
 
 [[palette]]
 name = "Ruby"
@@ -251,24 +188,6 @@ grad_a = "#e8e8ff"
 grad_b = "#d8d8f0"
 
 [[palette]]
-name = "Obsidian"
-bg = "#0A0A0A"
-fg = "#E0E0E0"
-acc = "#A0A0A0"
-muted = "#2A2A2A"
-grad_a = "#080808"
-grad_b = "#1a1a1a"
-
-[[palette]]
-name = "Champagne"
-bg = "#F5EFE0"
-fg = "#2A2010"
-acc = "#B8860B"
-muted = "#D8D0B8"
-grad_a = "#f5efe0"
-grad_b = "#e8e0c8"
-
-[[palette]]
 name = "Storm"
 bg = "#1C1E2E"
 fg = "#E0E4F0"
@@ -276,15 +195,6 @@ acc = "#7C8DBB"
 muted = "#2E3050"
 grad_a = "#12142a"
 grad_b = "#1c1e3a"
-
-[[palette]]
-name = "Rosewood"
-bg = "#2A0A12"
-fg = "#F8E0E4"
-acc = "#E11D48"
-muted = "#4A1A28"
-grad_a = "#200810"
-grad_b = "#3a1020"
 
 [[palette]]
 name = "Celadon"
@@ -305,15 +215,6 @@ grad_a = "#140e0a"
 grad_b = "#2a1c14"
 
 [[palette]]
-name = "Lavender Fields"
-bg = "#EDE8FF"
-fg = "#1A1040"
-acc = "#8B5CF6"
-muted = "#D0C8F0"
-grad_a = "#ede8ff"
-grad_b = "#dcd4f8"
-
-[[palette]]
 name = "Steel"
 bg = "#0F1419"
 fg = "#E0E6EC"
@@ -330,15 +231,6 @@ acc = "#EA580C"
 muted = "#5A3A28"
 grad_a = "#2a1810"
 grad_b = "#4a2a18"
-
-[[palette]]
-name = "Ivory Tower"
-bg = "#FDFAF5"
-fg = "#2A2218"
-acc = "#92400E"
-muted = "#E0D8C8"
-grad_a = "#fdfaf5"
-grad_b = "#f5f0e5"
 
 [[palette]]
 name = "Electric"
@@ -359,15 +251,6 @@ grad_a = "#f0f8e8"
 grad_b = "#e0f0d8"
 
 [[palette]]
-name = "Onyx"
-bg = "#141414"
-fg = "#E8E8E8"
-acc = "#D4D4D4"
-muted = "#2A2A2A"
-grad_a = "#0e0e0e"
-grad_b = "#1e1e1e"
-
-[[palette]]
 name = "Flamingo"
 bg = "#2A1420"
 fg = "#FFE0EC"
@@ -375,15 +258,6 @@ acc = "#F472B6"
 muted = "#4A2038"
 grad_a = "#200e18"
 grad_b = "#3a1828"
-
-[[palette]]
-name = "Mango"
-bg = "#2A1E08"
-fg = "#FFF4E0"
-acc = "#FBBF24"
-muted = "#4A3A14"
-grad_a = "#1a1200"
-grad_b = "#2a2008"
 
 [[palette]]
 name = "Powder Blue"
@@ -395,51 +269,6 @@ grad_a = "#e8f4ff"
 grad_b = "#d0e8f8"
 
 [[palette]]
-name = "Burgundy"
-bg = "#1A0810"
-fg = "#F8E8EC"
-acc = "#BE123C"
-muted = "#3A1828"
-grad_a = "#12040a"
-grad_b = "#2a101a"
-
-[[palette]]
-name = "Sand Dune"
-bg = "#D8CDB8"
-fg = "#2A2218"
-acc = "#A16207"
-muted = "#B8AC94"
-grad_a = "#d8cdb8"
-grad_b = "#c8baa4"
-
-[[palette]]
-name = "Nordic"
-bg = "#1A2A3A"
-fg = "#E8F0F8"
-acc = "#5E81AC"
-muted = "#2A3A4A"
-grad_a = "#0e1a28"
-grad_b = "#1a2a3a"
-
-[[palette]]
-name = "Mauve"
-bg = "#2A1828"
-fg = "#F8E8F0"
-acc = "#C026D3"
-muted = "#4A2848"
-grad_a = "#200e1e"
-grad_b = "#3a1a30"
-
-[[palette]]
-name = "Sage Light"
-bg = "#F2F0EB"
-fg = "#1C2420"
-acc = "#059669"
-muted = "#D0CCC0"
-grad_a = "#f2f0eb"
-grad_b = "#e4e0d8"
-
-[[palette]]
 name = "Carbon"
 bg = "#111111"
 fg = "#D8D8D8"
@@ -447,24 +276,6 @@ acc = "#FF6B35"
 muted = "#282828"
 grad_a = "#0a0a0a"
 grad_b = "#181818"
-
-[[palette]]
-name = "Ochre"
-bg = "#2A200A"
-fg = "#F8F0D8"
-acc = "#D97706"
-muted = "#4A3A18"
-grad_a = "#1a1404"
-grad_b = "#3a2a0e"
-
-[[palette]]
-name = "Denim"
-bg = "#1E2A4A"
-fg = "#E8F0FF"
-acc = "#3B82F6"
-muted = "#2E3A5A"
-grad_a = "#0e1830"
-grad_b = "#1e2a4a"
 
 [[palette]]
 name = "Amethyst"
@@ -485,10 +296,19 @@ grad_a = "#fff0f5"
 grad_b = "#ffe0ea"
 
 [[palette]]
-name = "Graphite"
-bg = "#242424"
-fg = "#F0F0F0"
-acc = "#60A5FA"
-muted = "#3A3A3A"
-grad_a = "#1a1a1a"
-grad_b = "#282828"
+name = "Lagoon"
+bg = "#0A1A1A"
+fg = "#D0F5F0"
+acc = "#2EC4B6"
+muted = "#1A3A38"
+grad_a = "#0a1a1a"
+grad_b = "#153030"
+
+[[palette]]
+name = "Sandstone"
+bg = "#F0E6D4"
+fg = "#2C1810"
+acc = "#B85C38"
+muted = "#D4C4A8"
+grad_a = "#f5e6d0"
+grad_b = "#e8d4b8"
