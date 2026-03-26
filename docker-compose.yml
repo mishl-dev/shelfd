@@ -33,8 +33,14 @@ services:
       - backend
     volumes:
       - shelfie_data:/data
-    # Healthcheck omitted — distroless image has no shell or wget/curl
     restart: unless-stopped
+    develop:
+      watch:
+        - action: rebuild
+          path: Cargo.toml
+        - action: rebuild
+          initial_sync: true
+          path: ./src
 
   flaresolverr:
     image: ghcr.io/flaresolverr/flaresolverr:latest
@@ -46,7 +52,6 @@ services:
       TZ: UTC
       MAX_CONCURRENT_SESSIONS: 1
       MAX_PRELAUNCHED_CONTEXTS: 1
-      # --single-process trades process isolation for lower memory usage
       LAUNCH_OPTIONS: >
         --disable-gpu
         --no-sandbox

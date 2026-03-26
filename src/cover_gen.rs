@@ -2,8 +2,7 @@ use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 
-use rand::Rng;
-use rand::SeedableRng;
+use rand::{Rng, RngExt, SeedableRng};
 use rand::rngs::StdRng;
 use resvg::usvg::{Options, Tree, fontdb};
 use serde::Deserialize;
@@ -46,21 +45,21 @@ fn escape_xml(s: &str) -> String {
 }
 
 fn gradient_params(rng: &mut impl Rng, p: &Palette) -> [String; 6] {
-    let angle = rng.gen_range(0..360u32);
-    let solid = rng.gen_bool(0.4);
+    let angle = rng.random_range(0..360u32);
+    let solid = rng.random_bool(0.4);
 
-    let c1 = if rng.gen_bool(0.5) { &p.grad_a } else { &p.bg };
-    let c2 = if solid || rng.gen_bool(0.5) {
+    let c1 = if rng.random_bool(0.5) { &p.grad_a } else { &p.bg };
+    let c2 = if solid || rng.random_bool(0.5) {
         c1
     } else {
         &p.grad_b
     };
 
-    let rad = (angle as f64).to_radians();
-    let x1 = (50.0 - 50.0 * rad.cos()).round() as u32;
-    let y1 = (50.0 - 50.0 * rad.sin()).round() as u32;
-    let x2 = (50.0 + 50.0 * rad.cos()).round() as u32;
-    let y2 = (50.0 + 50.0 * rad.sin()).round() as u32;
+    let rad: f64 = (angle as f64).to_radians();
+    let x1 = (50.0_f64 - 50.0 * rad.cos()).round() as u32;
+    let y1 = (50.0_f64 - 50.0 * rad.sin()).round() as u32;
+    let x2 = (50.0_f64 + 50.0 * rad.cos()).round() as u32;
+    let y2 = (50.0_f64 + 50.0 * rad.sin()).round() as u32;
 
     [
         x1.to_string(),
@@ -146,28 +145,28 @@ fn wrap_title(title: &str) -> Vec<String> {
 }
 
 fn generate_shapes(rng: &mut impl Rng, acc: &str) -> [String; 4] {
-    let shape_types: Vec<usize> = (0..4).map(|_| rng.gen_range(0..4)).collect();
+    let shape_types: Vec<usize> = (0..4).map(|_| rng.random_range(0..4)).collect();
     let mut shapes = [const { String::new() }; 4];
 
     for (i, &shape) in shape_types.iter().enumerate() {
-        let opacity = rng.gen_range(20..=55) as f32 / 100.0;
+        let opacity = rng.random_range(20..=55) as f32 / 100.0;
 
         shapes[i] = match shape {
             0 => {
-                let cx = rng.gen_range(60..340u32);
-                let cy = rng.gen_range(40..320u32);
-                let r = rng.gen_range(40..130u32);
+                let cx = rng.random_range(60..340u32);
+                let cy = rng.random_range(40..320u32);
+                let r = rng.random_range(40..130u32);
                 format!(
                     r#"<circle cx="{cx}" cy="{cy}" r="{r}" fill="{acc}" opacity="{opacity:.2}"/>"#
                 )
             }
             1 => {
-                let cx = rng.gen_range(60..340u32);
-                let cy = rng.gen_range(60..300u32);
-                let w = rng.gen_range(80..220u32);
-                let h = rng.gen_range(80..220u32);
-                let rx = rng.gen_range(0..40u32);
-                let rot = rng.gen_range(0..45u32);
+                let cx = rng.random_range(60..340u32);
+                let cy = rng.random_range(60..300u32);
+                let w = rng.random_range(80..220u32);
+                let h = rng.random_range(80..220u32);
+                let rx = rng.random_range(0..40u32);
+                let rot = rng.random_range(0..45u32);
                 let x = cx.saturating_sub(w / 2);
                 let y = cy.saturating_sub(h / 2);
                 format!(
@@ -175,28 +174,28 @@ fn generate_shapes(rng: &mut impl Rng, acc: &str) -> [String; 4] {
                 )
             }
             2 => {
-                let cx = rng.gen_range(60..340u32);
-                let cy = rng.gen_range(60..320u32);
-                let rx = rng.gen_range(60..160u32);
-                let ry = rng.gen_range(30..80u32);
-                let rot = rng.gen_range(0..180u32);
+                let cx = rng.random_range(60..340u32);
+                let cy = rng.random_range(60..320u32);
+                let rx = rng.random_range(60..160u32);
+                let ry = rng.random_range(30..80u32);
+                let rot = rng.random_range(0..180u32);
                 format!(
                     r#"<ellipse cx="{cx}" cy="{cy}" rx="{rx}" ry="{ry}" fill="{acc}" opacity="{opacity:.2}" transform="rotate({rot} {cx} {cy})"/>"#
                 )
             }
             _ => {
-                let n = rng.gen_range(3..=6usize);
+                let n = rng.random_range(3..=6usize);
                 let pts: Vec<String> = (0..n)
                     .map(|_| {
                         format!(
                             "{},{}",
-                            rng.gen_range(40..360u32),
-                            rng.gen_range(40..420u32)
+                            rng.random_range(40..360u32),
+                            rng.random_range(40..420u32)
                         )
                     })
                     .collect();
-                let sw = rng.gen_range(1..=3u32);
-                let op = rng.gen_range(40..=80) as f32 / 100.0;
+                let sw = rng.random_range(1..=3u32);
+                let op = rng.random_range(40..=80) as f32 / 100.0;
                 format!(
                     r#"<polygon points="{}" fill="none" stroke="{acc}" stroke-width="{sw}" opacity="{op:.2}"/>"#,
                     pts.join(" ")
@@ -218,7 +217,7 @@ pub fn render_cover(title: &str, author: &str) -> anyhow::Result<Vec<u8>> {
         hasher.finish()
     };
     let mut rng = StdRng::seed_from_u64(seed);
-    let p = &palettes[rng.gen_range(0..palettes.len())];
+    let p = &palettes[rng.random_range(0..palettes.len())];
 
     let g = gradient_params(&mut rng, p);
     let shapes = generate_shapes(&mut rng, &p.acc);

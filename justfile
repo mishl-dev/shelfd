@@ -1,9 +1,6 @@
 set shell := ["bash", "-cu"]
 
 default:
-    @just menu
-
-menu:
     #!/usr/bin/env bash
     cmd=$(just --list --unsorted \
         | tail -n +2 \
@@ -26,6 +23,10 @@ up:
 # Stop services
 down:
     docker compose down
+
+# Watch for file changes
+watch: 
+    docker compose up --build --watch
 
 # Restart containers (keeps cache)
 rebuild:
