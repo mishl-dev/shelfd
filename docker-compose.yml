@@ -1,9 +1,9 @@
 services:
-  shelfie:
+  shelfd:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: shelfie
+    container_name: shelfd
     depends_on:
       flaresolverr:
         condition: service_healthy
@@ -12,11 +12,11 @@ services:
       BIND_ADDR: 0.0.0.0:7451
       ARCHIVE_BASE: ${ARCHIVE_URL:-http://localhost:8080}
       ARCHIVE_NAME: Archive
-      APP_NAME: shelfie
+      APP_NAME: shelfd
       METADATA_BASE_URL: https://openlibrary.org
       FLARESOLVERR_URL: http://flaresolverr:8191
-      FLARESOLVERR_SESSION: shelfie-session
-      RUST_LOG: info,shelfie=debug
+      FLARESOLVERR_SESSION: shelfd-session
+      RUST_LOG: info,shelfd=debug
       SEARCH_CACHE_TTL_SECS: 1800
       BOOK_CACHE_TTL_SECS: 86400
       LINK_CACHE_TTL_SECS: 86400
@@ -32,7 +32,7 @@ services:
     networks:
       - backend
     volumes:
-      - shelfie_data:/data
+      - shelfd_data:/data
     restart: unless-stopped
     develop:
       watch:
@@ -78,4 +78,4 @@ networks:
     driver: bridge
 
 volumes:
-  shelfie_data:
+  shelfd_data:

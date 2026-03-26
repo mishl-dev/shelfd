@@ -7,7 +7,7 @@ use tokio::time::Duration;
 
 pub fn build_http_client() -> Result<Client> {
     Client::builder()
-        .user_agent(concat!("shelfie/", env!("CARGO_PKG_VERSION")))
+        .user_agent(concat!("shelfd/", env!("CARGO_PKG_VERSION")))
         .connect_timeout(Duration::from_secs(5))
         .timeout(Duration::from_secs(300))
         .pool_idle_timeout(Duration::from_secs(90))

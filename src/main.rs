@@ -182,7 +182,7 @@ mod tests {
             http,
             archive_base: "https://example.com".to_owned(),
             archive_name: "Archive".to_owned(),
-            app_name: "shelfie".to_owned(),
+            app_name: "shelfd".to_owned(),
             metadata_base_url: "https://openlibrary.org".to_owned(),
             public_base_url: Some("http://localhost:7451".to_owned()),
             search_cache_ttl_secs: 1800,

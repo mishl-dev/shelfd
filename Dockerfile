@@ -16,11 +16,11 @@ RUN mkdir -p /data
 FROM gcr.io/distroless/cc
 
 COPY --from=builder /data /data
-COPY --from=builder /app/target/release/shelfie /usr/local/bin/shelfie
+COPY --from=builder /app/target/release/shelfd /usr/local/bin/shelfd
 
 ENV DATABASE_URL=sqlite:///data/opds.db?mode=rwc
 ENV BIND_ADDR=0.0.0.0:7451
 
 EXPOSE 7451
 
-CMD ["/usr/local/bin/shelfie"]
+CMD ["/usr/local/bin/shelfd"]

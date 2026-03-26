@@ -46,7 +46,7 @@ pub struct AppConfig {
 
 #[derive(Debug, Parser)]
 #[command(
-    name = "shelfie",
+    name = "shelfd",
     version,
     about = "Self-hosted OPDS bridge for book archives"
 )]
@@ -92,7 +92,7 @@ pub struct ServeArgs {
     /// Override the public base URL used in OPDS links.
     #[arg(long, env = "PUBLIC_BASE_URL")]
     pub public_base_url: Option<String>,
-    /// Override the log filter, for example info,shelfie=debug.
+    /// Override the log filter, for example info,shelfd=debug.
     #[arg(long, env = "RUST_LOG")]
     pub rust_log: Option<String>,
     /// Choose the terminal log formatter.
@@ -138,7 +138,7 @@ pub fn load_config(args: &ServeArgs) -> Result<AppConfig> {
         app_name: args
             .app_name
             .clone()
-            .unwrap_or_else(|| env_or("APP_NAME", "shelfie")),
+            .unwrap_or_else(|| env_or("APP_NAME", "shelfd")),
         metadata_base_url: args
             .metadata_base_url
             .clone()
@@ -160,7 +160,7 @@ pub fn load_config(args: &ServeArgs) -> Result<AppConfig> {
         rust_log: args
             .rust_log
             .clone()
-            .unwrap_or_else(|| env_or("RUST_LOG", "info,shelfie=debug,tower_http=warn")),
+            .unwrap_or_else(|| env_or("RUST_LOG", "info,shelfd=debug,tower_http=warn")),
         log_style: args.log_style.unwrap_or_else(|| {
             std::env::var("LOG_STYLE")
                 .ok()

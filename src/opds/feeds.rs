@@ -510,11 +510,11 @@ mod tests {
                 slug: "science_fiction".to_owned(),
                 name: "Science Fiction".to_owned(),
             }],
-            "shelfie",
+            "shelfd",
             "Archive",
         );
         assert!(xml.contains("Explore Books"));
-        assert!(xml.contains("Browse Archive through shelfie."));
+        assert!(xml.contains("Browse Archive through shelfd."));
         assert!(xml.contains("rel=\"search\""));
         assert!(xml.contains("/opds/opensearch.xml"));
         assert!(xml.contains("xmlns:opensearch=\"http://a9.com/-/spec/opensearch/1.1/\""));
@@ -533,12 +533,12 @@ mod tests {
                 slug: "science_fiction".to_owned(),
                 name: "Science Fiction".to_owned(),
             }],
-            "shelfie",
+            "shelfd",
             "Archive",
         );
 
-        assert!(xml.contains("<title>shelfie</title>"));
-        assert!(xml.contains("Browse and search Archive through shelfie."));
+        assert!(xml.contains("<title>shelfd</title>"));
+        assert!(xml.contains("Browse and search Archive through shelfd."));
         assert!(xml.contains("/opds/explore/top"));
     }
 
@@ -564,7 +564,7 @@ mod tests {
             1,
             false,
             None,
-            "shelfie",
+            "shelfd",
             "Archive",
             "https://example.com",
         );
@@ -600,7 +600,7 @@ mod tests {
             description: None,
         }];
 
-        let xml = search_feed("dune", &books, 2, true, None, "shelfie", "Archive", "https://example.com");
+        let xml = search_feed("dune", &books, 2, true, None, "shelfd", "Archive", "https://example.com");
 
         assert!(xml.contains("rel=\"next\""));
         assert!(xml.contains("/opds/search?q=dune&amp;page=3"));
@@ -611,7 +611,7 @@ mod tests {
     #[test]
     fn open_search_description_points_to_search_template() {
         let xml =
-            build_open_search_description(Some("http://localhost:7451"), "shelfie", "Archive");
+            build_open_search_description(Some("http://localhost:7451"), "shelfd", "Archive");
 
         assert!(xml.contains("OpenSearchDescription"));
         assert!(xml.contains("template=\"http://localhost:7451/opds/search?q={searchTerms}\""));
@@ -626,7 +626,7 @@ mod tests {
                 slug: "science_fiction".to_owned(),
                 name: "Science Fiction".to_owned(),
             }],
-            "shelfie",
+            "shelfd",
             "Archive",
         );
 

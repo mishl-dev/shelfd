@@ -2477,7 +2477,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "shelfie"
+name = "shelfd"
 version = "0.1.0"
 dependencies = [
  "anyhow",

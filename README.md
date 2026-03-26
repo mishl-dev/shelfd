@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="assets/logo.svg" alt="shelfie logo" width="132">
+  <img src="assets/logo.svg" alt="shelfd logo" width="132">
 </p>
 
-<h1 align="center">shelfie</h1>
+<h1 align="center">shelfd</h1>
 
 <p align="center">
   Self-hosted OPDS bridge for ebook archives.
