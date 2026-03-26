@@ -5,126 +5,88 @@
 <h1 align="center">shelfd</h1>
 
 <p align="center">
-  Self-hosted OPDS bridge for ebook archives.
+  A small self-hosted OPDS server for ebook archives.
 </p>
 
 <p align="center">
-  <a href="#run">Run</a>
-  ·
-  <a href="#config">Config</a>
-  ·
-  <a href="#endpoints">Endpoints</a>
-  ·
-  <a href="#dev">Dev</a>
+  Browse by subject, search from reader apps, and fill in covers and metadata automatically.
 </p>
 
-<p align="center">
-  Explore-first OPDS feed • Search for reader apps • Metadata and cover enrichment • Fallback cover generation
-</p>
+## What It Does
 
-## Highlights
+- turns an ebook archive into an OPDS catalog
+- gives you an explore-first browsing feed instead of search-only UX
+- still supports OPDS search for clients like Foliate
+- pulls metadata and covers from Open Library when available
+- generates fallback covers when nothing better exists
 
-- `GET /opds` root feed with explore-first browsing
-- OPDS search support for clients like Foliate
-- Open Library metadata and cover enrichment
-- generated fallback covers when no real cover exists
+## Quick Start
 
-## Run
+Run with `just`:
 
-With Docker Compose:
+```bash
+just up
+```
+
+Or without `just`:
 
 ```bash
 docker compose up --build
 ```
 
-Endpoints:
+Then open:
 
 - `http://localhost:7451/opds`
-- `http://localhost:7451/opds/explore`
-- `http://localhost:7451/opds/opensearch.xml`
-- `http://localhost:7451/healthz`
-- `http://localhost:7451/metrics`
 
 Stop:
+
+```bash
+just down
+```
+
+Or:
 
 ```bash
 docker compose down
 ```
 
-Locally:
+<details>
+  <summary><strong>Config</strong></summary>
 
-```bash
-cargo run -- serve
-```
+  <br>
 
-Pretty logs:
+  The defaults are enough to get started, but these are the settings you will most likely care about:
 
-```bash
-cargo run -- serve --log-style pretty
-```
+  - `ARCHIVE_BASE`: where your upstream archive lives
+  - `ARCHIVE_NAME`: display name shown in feeds
+  - `APP_NAME`: app name shown to OPDS clients
+  - `PUBLIC_BASE_URL`: public base URL for generated links
+  - `DATABASE_URL`: SQLite database location
+  - `RUST_LOG`: log level and filters
+</details>
 
-Print effective config:
+<details>
+  <summary><strong>Endpoints</strong></summary>
 
-```bash
-cargo run -- print-config
-```
+  <br>
 
-## Config
+  - `GET /opds`
+  - `GET /opds/search?q=...`
+  - `GET /healthz`
+</details>
 
-Main env vars:
+<details>
+  <summary><strong>Dev</strong></summary>
 
-- `DATABASE_URL`
-- `BIND_ADDR`
-- `ARCHIVE_BASE`
-- `ARCHIVE_NAME`
-- `APP_NAME`
-- `METADATA_BASE_URL`
-- `FLARESOLVERR_URL`
-- `FLARESOLVERR_SESSION`
-- `PUBLIC_BASE_URL`
-- `RUST_LOG`
-- `LOG_STYLE`
+  <br>
 
-Performance and cache:
-
-- `SEARCH_CACHE_TTL_SECS`
-- `BOOK_CACHE_TTL_SECS`
-- `LINK_CACHE_TTL_SECS`
-- `LINK_FAILURE_TTL_SECS`
-- `EXPLORE_CACHE_TTL_SECS`
-- `COVER_NEGATIVE_TTL_SECS`
-- `SEARCH_RESULT_LIMIT`
-- `EXPLORE_PAGE_SIZE`
-- `COVER_LOOKUP_LIMIT`
-- `INLINE_INFO_CONCURRENCY`
-- `COVER_LOOKUP_CONCURRENCY`
-- `SEARCH_PREWARM_COUNT`
-- `UPSTREAM_RETRY_ATTEMPTS`
-- `UPSTREAM_RETRY_BACKOFF_MS`
-- `CACHE_CLEANUP_INTERVAL_SECS`
-- `EXPLORE_SUBJECTS`
-
-## Endpoints
-
-- `GET /opds`
-- `GET /opds/explore`
-- `GET /opds/explore/top`
-- `GET /opds/explore/subject/{subject}`
-- `GET /opds/search?q=...`
-- `GET /opds/opensearch.xml`
-- `GET /opds/cover/{md5}`
-- `GET /opds/download/{md5}`
-- `GET /healthz`
-- `GET /readyz`
-- `GET /metrics`
-
-## Dev
-
-```bash
-cargo test
-cargo clippy --all-targets --all-features -- -D warnings
-cargo fmt
-```
+  ```bash
+  just up
+  just test
+  just lint
+  just fmt
+  ```
+</details>
 
 ## License
 
