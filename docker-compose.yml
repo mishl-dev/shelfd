@@ -39,7 +39,6 @@ services:
         - action: rebuild
           path: Cargo.toml
         - action: rebuild
-          initial_sync: true
           path: ./src
 
   flaresolverr:
