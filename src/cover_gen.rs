@@ -223,16 +223,17 @@ pub fn render_cover(title: &str, author: &str) -> anyhow::Result<Vec<u8>> {
     let shapes = generate_shapes(&mut rng, &p.acc);
     let lines = wrap_title(title);
 
-    // Adaptive font size: find longest line, scale so it fits ~340px.
-    let single_line = lines.len() == 1;
-    let longest = lines.iter().map(|l| l.len()).max().unwrap_or(0);
-    let font_size = if single_line {
-        52u32
-    } else {
-        let max_px = longest as f64 * 0.47; // char width at 1px
-        let scale = 340.0 / max_px;
-        scale.round().clamp(20.0, 42.0) as u32
-    };
+     // Adaptive font size: find longest line, scale so it fits ~300px.
+     let single_line = lines.len() == 1;
+     let longest = lines.iter().map(|l| l.len()).max().unwrap_or(0);
+     let max_px = longest as f64 * 0.47; // char width at 1px
+     let font_size = if single_line {
+         let scale = 300.0 / max_px;
+         scale.round().clamp(20.0, 52.0) as u32
+     } else {
+         let scale = 300.0 / max_px;
+         scale.round().clamp(20.0, 42.0) as u32
+     };
 
     let line1 = lines.first().map(String::as_str).unwrap_or("");
     let line2 = lines.get(1).map(String::as_str).unwrap_or("");
