@@ -1,14 +1,31 @@
 <p align="center">
-  <img src="assets/logo.svg" alt="shelfie logo">
+  <img src="assets/logo.svg" alt="shelfie logo" width="132">
 </p>
 
-# shelfie
+<h1 align="center">shelfie</h1>
 
-Self-hosted OPDS bridge for ebook archives.
+<p align="center">
+  Self-hosted OPDS bridge for ebook archives.
+</p>
 
-- OPDS root at `/opds`
-- explore feed as the default browsing flow
-- OPDS search still available for clients like Foliate
+<p align="center">
+  <a href="#run">Run</a>
+  ·
+  <a href="#config">Config</a>
+  ·
+  <a href="#endpoints">Endpoints</a>
+  ·
+  <a href="#dev">Dev</a>
+</p>
+
+<p align="center">
+  Explore-first OPDS feed • Search for reader apps • Metadata and cover enrichment • Fallback cover generation
+</p>
+
+## Highlights
+
+- `GET /opds` root feed with explore-first browsing
+- OPDS search support for clients like Foliate
 - Open Library metadata and cover enrichment
 - generated fallback covers when no real cover exists
 
