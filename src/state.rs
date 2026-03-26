@@ -1,6 +1,6 @@
 use std::{
     collections::HashMap,
-    sync::{Arc, atomic::AtomicU64},
+    sync::{atomic::AtomicU64, Arc},
 };
 
 use dashmap::DashMap;
@@ -28,8 +28,10 @@ pub struct AppState {
     pub cover_negative_ttl_secs: i64,
     pub search_result_limit: usize,
     pub explore_page_size: usize,
+    #[allow(dead_code)]
     pub cover_lookup_limit: usize,
     pub inline_info_concurrency: usize,
+    #[allow(dead_code)]
     pub cover_lookup_concurrency: usize,
     pub upstream_retry_attempts: usize,
     pub upstream_retry_backoff_ms: u64,

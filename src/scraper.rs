@@ -83,6 +83,7 @@ pub fn has_search_error(html: &str) -> bool {
 }
 
 /// Remove `<script>` blocks so debug logs show mostly semantic markup.
+#[allow(dead_code)]
 pub fn strip_script_tags(html: &str) -> String {
     let mut out = String::with_capacity(html.len());
     let mut rest = html;

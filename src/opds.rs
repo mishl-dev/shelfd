@@ -59,6 +59,7 @@ pub async fn open_search(State(state): State<AppState>) -> Response {
         .into_response()
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn search_feed(
     query: &str,
     books: &[BookEntry],
@@ -426,7 +427,7 @@ fn entry(
     {
         let thumb_url = absolute_url(
             public_base_url,
-            &format!("/opds/cover/{}?size=small", book.md5),
+            &format!("/opds/cover/{}?size=medium", book.md5),
         );
         let mut thumb_tag = BytesStart::new("link");
         thumb_tag.push_attribute(("rel", "http://opds-spec.org/image/thumbnail"));
@@ -434,7 +435,10 @@ fn entry(
         thumb_tag.push_attribute(("type", "image/jpeg"));
         w.write_event(Event::Empty(thumb_tag)).unwrap();
 
-        let image_url = absolute_url(public_base_url, &format!("/opds/cover/{}", book.md5));
+        let image_url = absolute_url(
+            public_base_url,
+            &format!("/opds/cover/{}?size=large", book.md5),
+        );
         let mut tag = BytesStart::new("link");
         tag.push_attribute(("rel", "http://opds-spec.org/image"));
         tag.push_attribute(("href", image_url.as_str()));
@@ -504,7 +508,7 @@ fn explore_entry(
     if let Some(cover_id) = entry.cover_url.as_deref().and_then(extract_cover_id) {
         let thumb_url = absolute_url(
             public_base_url,
-            &format!("/opds/cover/{cover_id}?size=small"),
+            &format!("/opds/cover/{cover_id}?size=medium"),
         );
         let mut thumb_tag = BytesStart::new("link");
         thumb_tag.push_attribute(("rel", "http://opds-spec.org/image/thumbnail"));
@@ -512,7 +516,10 @@ fn explore_entry(
         thumb_tag.push_attribute(("type", "image/jpeg"));
         w.write_event(Event::Empty(thumb_tag)).unwrap();
 
-        let image_url = absolute_url(public_base_url, &format!("/opds/cover/{cover_id}"));
+        let image_url = absolute_url(
+            public_base_url,
+            &format!("/opds/cover/{cover_id}?size=large"),
+        );
         let mut img_tag = BytesStart::new("link");
         img_tag.push_attribute(("rel", "http://opds-spec.org/image"));
         img_tag.push_attribute(("href", image_url.as_str()));

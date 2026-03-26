@@ -12,6 +12,7 @@ use tower_http::trace::TraceLayer;
 use tracing::info;
 
 mod config;
+mod cover_gen;
 mod db;
 mod flaresolverr;
 mod http;
