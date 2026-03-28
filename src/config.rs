@@ -18,6 +18,7 @@ pub struct AppConfig {
     pub database_url: String,
     pub bind_addr: String,
     pub archive_base: String,
+    pub archive_bases: Vec<String>,
     pub archive_name: String,
     pub app_name: String,
     pub metadata_base_url: String,
@@ -127,6 +128,20 @@ pub fn load_config(args: &ServeArgs) -> Result<AppConfig> {
             .bind_addr
             .clone()
             .unwrap_or_else(|| env_or("BIND_ADDR", "0.0.0.0:7070")),
+        archive_bases: {
+            let raw = args
+                .archive_base
+                .clone()
+                .unwrap_or_else(|| env_or("ARCHIVE_URLS", ""));
+            if raw.is_empty() {
+                vec![env_or("ARCHIVE_BASE", "http://localhost:8080")]
+            } else {
+                raw.split(',')
+                    .map(|s| s.trim().trim_end_matches('/').to_owned())
+                    .filter(|s| !s.is_empty())
+                    .collect()
+            }
+        },
         archive_base: args
             .archive_base
             .clone()

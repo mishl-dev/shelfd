@@ -1,6 +1,6 @@
 use std::{
     collections::HashMap,
-    sync::{atomic::AtomicU64, Arc},
+    sync::{atomic::AtomicU64, atomic::AtomicUsize, Arc},
 };
 
 use dashmap::DashMap;
@@ -16,6 +16,8 @@ pub struct AppState {
     pub pool: Arc<SqlitePool>,
     pub http: Client,
     pub archive_base: String,
+    pub archive_bases: Arc<Vec<String>>,
+    pub archive_rr: Arc<AtomicUsize>,
     pub archive_name: String,
     pub app_name: String,
     pub metadata_base_url: String,
@@ -43,6 +45,18 @@ pub struct AppState {
     pub download_inflight: Arc<DashMap<String, Arc<Notify>>>,
     pub cover_inflight: Arc<DashMap<String, Arc<Notify>>>,
     pub hot_cover_resolutions: Arc<DashMap<String, HotCoverResolution>>,
+}
+
+impl AppState {
+    pub fn next_archive_base(&self) -> &str {
+        if self.archive_bases.len() <= 1 {
+            return &self.archive_bases[0];
+        }
+        let idx = self
+            .archive_rr
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        &self.archive_bases[idx % self.archive_bases.len()]
+    }
 }
 
 #[derive(Default)]

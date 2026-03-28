@@ -83,7 +83,7 @@ pub async fn resolve_download(state: &AppState, md5: &str) -> anyhow::Result<Str
         }
     };
 
-    let slow_url = format!("{}/slow_download/{}/0/4", state.archive_base, md5);
+    let slow_url = format!("{}/slow_download/{}/0/4", state.next_archive_base(), md5);
     state
         .metrics
         .flaresolverr_solves_started

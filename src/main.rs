@@ -65,6 +65,12 @@ async fn main() -> Result<()> {
         pool: Arc::new(pool),
         http,
         archive_base: config.archive_base.clone(),
+        archive_bases: Arc::new(if config.archive_bases.is_empty() {
+            vec![config.archive_base.clone()]
+        } else {
+            config.archive_bases.clone()
+        }),
+        archive_rr: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
         archive_name: config.archive_name.clone(),
         app_name: config.app_name.clone(),
         metadata_base_url: config.metadata_base_url.clone(),
@@ -181,6 +187,8 @@ mod tests {
             pool: Arc::new(pool),
             http,
             archive_base: "https://example.com".to_owned(),
+            archive_bases: Arc::new(vec!["https://example.com".to_owned()]),
+            archive_rr: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
             archive_name: "Archive".to_owned(),
             app_name: "shelfd".to_owned(),
             metadata_base_url: "https://openlibrary.org".to_owned(),

@@ -12,6 +12,129 @@ pub fn retry_backoff(base_ms: u64, attempt: usize) -> Duration {
     Duration::from_millis(base_ms.saturating_mul(multiplier))
 }
 
+pub async fn get_text_raced(
+    state: &AppState,
+    path: &str,
+    label: &'static str,
+) -> anyhow::Result<String> {
+    if state.archive_bases.len() <= 1 {
+        let url = format!("{}{}", state.archive_bases[0], path);
+        return get_text_with_retry(state, &url, label).await;
+    }
+
+    trace!(instances = state.archive_bases.len(), "racing archive text request");
+
+    let mut handles: Vec<_> = state
+        .archive_bases
+        .iter()
+        .map(|base| {
+            let url = format!("{}{}", base, path);
+            let http = state.http.clone();
+            tokio::spawn(async move {
+                let resp = http.get(&url).send().await?;
+                resp.error_for_status()?.text().await
+                    .with_context(|| format!("{label} body read failed"))
+            })
+        })
+        .collect();
+
+    let mut last_error = None;
+    while !handles.is_empty() {
+        let (result, _index, remaining) = futures::future::select_all(handles).await;
+        handles = remaining;
+        match result {
+            Ok(Ok(text)) => return Ok(text),
+            Ok(Err(e)) => last_error = Some(e),
+            Err(e) => last_error = Some(anyhow::anyhow!("{label} task failed: {e}")),
+        }
+    }
+
+    Err(last_error.unwrap_or_else(|| anyhow::anyhow!("{label} failed without an error")))
+}
+
+pub async fn get_text_raced(
+    state: &AppState,
+    path: &str,
+    label: &'static str,
+) -> anyhow::Result<String> {
+    if state.archive_bases.len() <= 1 {
+        let url = format!("{}{}", state.archive_bases[0], path);
+        return get_text_with_retry(state, &url, label).await;
+    }
+
+    trace!(instances = state.archive_bases.len(), "racing archive text request");
+
+    let mut handles: Vec<_> = state
+        .archive_bases
+        .iter()
+        .map(|base| {
+            let url = format!("{}{}", base, path);
+            let http = state.http.clone();
+            tokio::spawn(async move {
+                let resp = http.get(&url).send().await?;
+                resp.error_for_status()?.text().await
+                    .with_context(|| format!("{label} body read failed"))
+            })
+        })
+        .collect();
+
+    let mut last_error = None;
+    while !handles.is_empty() {
+        let (result, _index, remaining) = futures::future::select_all(handles).await;
+        handles = remaining;
+        match result {
+            Ok(Ok(text)) => return Ok(text),
+            Ok(Err(e)) => last_error = Some(e),
+            Err(e) => last_error = Some(anyhow::anyhow!("{label} task failed: {e}")),
+        }
+    }
+
+    Err(last_error.unwrap_or_else(|| anyhow::anyhow!("{label} failed without an error")))
+}
+
+pub async fn get_json_raced<T>(
+    state: &AppState,
+    path: &str,
+    label: &'static str,
+) -> anyhow::Result<T>
+where
+    T: serde::de::DeserializeOwned + Send + 'static,
+{
+    if state.archive_bases.len() <= 1 {
+        let url = format!("{}{}", state.archive_bases[0], path);
+        return get_json_with_retry(state, &url, label).await;
+    }
+
+    trace!(instances = state.archive_bases.len(), "racing archive json request");
+
+    let mut handles: Vec<_> = state
+        .archive_bases
+        .iter()
+        .map(|base| {
+            let url = format!("{}{}", base, path);
+            let http = state.http.clone();
+            tokio::spawn(async move {
+                let resp = http.get(&url).send().await?;
+                resp.error_for_status()?.json::<T>().await
+                    .with_context(|| format!("{label} JSON parse failed"))
+            })
+        })
+        .collect();
+
+    let mut last_error = None;
+    while !handles.is_empty() {
+        let (result, _index, remaining) = futures::future::select_all(handles).await;
+        handles = remaining;
+        match result {
+            Ok(Ok(body)) => return Ok(body),
+            Ok(Err(e)) => last_error = Some(e),
+            Err(e) => last_error = Some(anyhow::anyhow!("{label} task failed: {e}")),
+        }
+    }
+
+    Err(last_error.unwrap_or_else(|| anyhow::anyhow!("{label} failed without an error")))
+}
+
 pub async fn get_text_with_retry(
     state: &AppState,
     url: &str,

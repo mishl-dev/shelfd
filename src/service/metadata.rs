@@ -16,7 +16,9 @@ pub async fn enrich_book_metadata(state: &AppState, md5: &str) -> Option<String>
     let enrichment = fetch_ol_metadata(state, &book).await;
     let mut updated = book;
     updated.cover_url = enrichment.cover_url.clone();
-    updated.cover_checked_at = Some(db::unix_now());
+    if enrichment.cover_url.is_some() {
+        updated.cover_checked_at = Some(db::unix_now());
+    }
     if updated.first_publish_year.is_none() {
         updated.first_publish_year = enrichment.first_publish_year;
     }
@@ -32,51 +34,86 @@ pub async fn enrich_book_metadata(state: &AppState, md5: &str) -> Option<String>
 
 #[instrument(skip(state, book), fields(title = %book.title, author = %book.author))]
 async fn fetch_ol_metadata(state: &AppState, book: &BookEntry) -> OlEnrichment {
-    let url = format!(
-        "{}/search.json?title={}&author={}&limit={}&fields=cover_i,cover_edition_key,subject,first_publish_year,language,editions,editions.key,editions.cover_i",
-        state.metadata_base_url,
-        urlencoding::encode(&book.title),
-        urlencoding::encode(&book.author),
-        state.cover_lookup_limit.max(1),
-    );
-    debug!(title = %book.title, author = %book.author, "querying metadata provider");
-    match get_json_with_retry::<OlResponse>(state, &url, "metadata lookup").await {
-        Ok(body) => {
-            let Some(doc) = body.docs.first() else {
-                return OlEnrichment::default();
-            };
-            let cover_url = select_cover_url(&body.docs);
-            if let Some(url) = cover_url.as_deref() {
-                debug!(title = %book.title, %url, "cover found");
+    let limit = state.cover_lookup_limit.max(1);
+    let fields = "cover_i,cover_edition_key,subject,first_publish_year,language,editions,editions.key,editions.cover_i";
+
+    let first_author = book.author.split(';').next().unwrap_or(&book.author).trim();
+
+    let attempts: Vec<(String, String)> = vec![
+        (
+            book.author.clone(),
+            format!(
+                "{}/search.json?title={}&author={}&limit={}&fields={fields}",
+                state.metadata_base_url,
+                urlencoding::encode(&book.title),
+                urlencoding::encode(&book.author),
+                limit,
+            ),
+        ),
+        (
+            first_author.to_owned(),
+            format!(
+                "{}/search.json?title={}&author={}&limit={}&fields={fields}",
+                state.metadata_base_url,
+                urlencoding::encode(&book.title),
+                urlencoding::encode(first_author),
+                limit,
+            ),
+        ),
+        (
+            String::new(),
+            format!(
+                "{}/search.json?title={}&limit={}&fields={fields}",
+                state.metadata_base_url,
+                urlencoding::encode(&book.title),
+                limit,
+            ),
+        ),
+    ];
+
+    for (author_label, url) in &attempts {
+        debug!(title = %book.title, author = %author_label, "querying metadata provider");
+        match get_json_with_retry::<OlResponse>(state, url, "metadata lookup").await {
+            Ok(body) => {
+                if body.docs.is_empty() {
+                    debug!(title = %book.title, author = %author_label, "no results, trying next fallback");
+                    continue;
+                }
+                let doc = &body.docs[0];
+                let cover_url = select_cover_url(&body.docs);
+                if let Some(url) = cover_url.as_deref() {
+                    debug!(title = %book.title, %url, "cover found");
+                }
+                let language = doc
+                    .language
+                    .as_ref()
+                    .and_then(|langs| langs.first().cloned());
+                let subjects: Vec<String> = doc
+                    .subject
+                    .as_ref()
+                    .map(|s| s.iter().take(5).cloned().collect())
+                    .unwrap_or_default();
+                debug!(
+                    title = %book.title,
+                    year = doc.first_publish_year,
+                    lang = language.as_deref().unwrap_or(""),
+                    subject_count = subjects.len(),
+                    "metadata found"
+                );
+                return OlEnrichment {
+                    cover_url,
+                    first_publish_year: doc.first_publish_year,
+                    language,
+                    subjects,
+                };
             }
-            let language = doc
-                .language
-                .as_ref()
-                .and_then(|langs| langs.first().cloned());
-            let subjects: Vec<String> = doc
-                .subject
-                .as_ref()
-                .map(|s| s.iter().take(5).cloned().collect())
-                .unwrap_or_default();
-            debug!(
-                title = %book.title,
-                year = doc.first_publish_year,
-                lang = language.as_deref().unwrap_or(""),
-                subject_count = subjects.len(),
-                "metadata found"
-            );
-            OlEnrichment {
-                cover_url,
-                first_publish_year: doc.first_publish_year,
-                language,
-                subjects,
+            Err(error) => {
+                warn!(title = %book.title, author = %author_label, error = %error, "failed to fetch Open Library response");
             }
-        }
-        Err(error) => {
-            warn!(title = %book.title, error = %error, "failed to fetch Open Library response");
-            OlEnrichment::default()
         }
     }
+
+    OlEnrichment::default()
 }
 
 fn select_cover_url(docs: &[OlDoc]) -> Option<String> {

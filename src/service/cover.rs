@@ -2,7 +2,7 @@ use axum::{
     http::{StatusCode, header},
     response::{IntoResponse, Response},
 };
-use tracing::info;
+use tracing::{debug, info};
 
 use crate::cover_gen::render_cover;
 use crate::db;
@@ -26,8 +26,18 @@ pub async fn resolve_cover_response(state: &AppState, param: &str, size_suffix: 
 
     let min_cached_at = db::unix_now() - state.book_cache_ttl_secs;
     let book = match db::get_cached_book(&state.pool, param, min_cached_at).await {
-        Ok(Some(cached)) => Some(cached.entry),
-        _ => None,
+        Ok(Some(cached)) => {
+            debug!(md5 = %param, title = %cached.entry.title, author = %cached.entry.author, "cover: book found in cache");
+            Some(cached.entry)
+        }
+        Ok(None) => {
+            debug!(md5 = %param, "cover: book NOT found in cache");
+            None
+        }
+        Err(e) => {
+            debug!(md5 = %param, error = %e, "cover: cache lookup error");
+            None
+        }
     };
 
     let title = book
@@ -182,6 +192,7 @@ fn cache_hot_cover_resolution(state: &AppState, md5: &str, cover_url: Option<Str
 }
 
 async fn generated_cover(title: &str, author: &str) -> Response {
+    debug!(%title, %author, "generating cover");
     match tokio::task::spawn_blocking({
         let title = title.to_owned();
         let author = author.to_owned();
@@ -194,7 +205,7 @@ async fn generated_cover(title: &str, author: &str) -> Response {
                 (header::CONTENT_TYPE, "image/png"),
                 (
                     header::CACHE_CONTROL,
-                    "public, max-age=86400, stale-while-revalidate=604800",
+                    "no-cache, no-store, must-revalidate",
                 ),
             ],
             png,

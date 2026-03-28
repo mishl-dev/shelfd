@@ -10,7 +10,7 @@ use crate::{db, opds, scraper};
 
 use super::inflight::{InflightRole, begin_inflight};
 use super::metadata::enrich_book_metadata;
-use super::retry::{get_json_with_retry, get_text_with_retry, log_sanitized_html};
+use super::retry::{get_json_with_retry, get_text_raced, log_sanitized_html};
 
 struct ResolvedBook {
     entry: BookEntry,
@@ -53,15 +53,13 @@ pub async fn do_search(state: &AppState, query: &str, page: usize) -> anyhow::Re
         }
     };
 
-    let search_url = format!(
-        "{}/search?q={}&page={}",
-        state.archive_base,
+    info!(query = %normalized_query, page, "starting archive search");
+    let search_path = format!(
+        "/search?q={}&page={}",
         urlencoding::encode(&normalized_query),
         page
     );
-
-    info!(query = %normalized_query, page, %search_url, "starting archive search");
-    let html = get_text_with_retry(state, &search_url, "archive search").await?;
+    let html = get_text_raced(state, &search_path, "archive search").await?;
     log_sanitized_html("search results", &html);
 
     if scraper::has_search_error(&html) {
@@ -161,7 +159,7 @@ async fn resolve_book_entry(
         };
     }
 
-    let url = format!("{}/dyn/md5/inline_info/{}", state.archive_base, entry.md5);
+    let url = format!("{}/dyn/md5/inline_info/{}", state.next_archive_base(), entry.md5);
     let downloads = fetch_downloads(state, &url).await;
     debug!(downloads, "inline info resolved");
 
