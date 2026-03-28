@@ -83,6 +83,7 @@ pub async fn do_search(state: &AppState, query: &str, page: usize) -> anyhow::Re
     let mut raw = scraper::parse_search_results(&html);
     let has_more = raw.len() > state.search_result_limit;
     raw.truncate(state.search_result_limit);
+    let raw = dedup_raw_entries(raw);
     state
         .metrics
         .search_result_books_seen
@@ -222,6 +223,17 @@ fn prewarm_related_assets(state: AppState, books: Vec<BookEntry>) {
     });
 }
 
+fn dedup_raw_entries(entries: Vec<scraper::RawEntry>) -> Vec<scraper::RawEntry> {
+    let mut seen = HashSet::new();
+    let mut unique = Vec::with_capacity(entries.len());
+    for entry in entries {
+        if seen.insert(entry.md5.clone()) {
+            unique.push(entry);
+        }
+    }
+    unique
+}
+
 #[instrument(skip(state), fields(url))]
 async fn fetch_downloads(state: &AppState, url: &str) -> i64 {
     use crate::models::InlineInfo;
@@ -311,4 +323,43 @@ fn fold_text(value: &str) -> String {
         .split_whitespace()
         .collect::<Vec<_>>()
         .join(" ")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::dedup_raw_entries;
+    use crate::scraper::RawEntry;
+
+    #[test]
+    fn dedup_raw_entries_retains_first_entry_for_each_md5() {
+        let entries = vec![
+            RawEntry {
+                md5: "a".into(),
+                title: "First".into(),
+                author: "Author".into(),
+            },
+            RawEntry {
+                md5: "b".into(),
+                title: "Second".into(),
+                author: "Writer".into(),
+            },
+            RawEntry {
+                md5: "a".into(),
+                title: "Duplicate".into(),
+                author: "Other".into(),
+            },
+            RawEntry {
+                md5: "c".into(),
+                title: "Third".into(),
+                author: "Author".into(),
+            },
+        ];
+
+        let deduped = dedup_raw_entries(entries);
+
+        assert_eq!(deduped.len(), 3);
+        assert_eq!(deduped[0].md5, "a");
+        assert_eq!(deduped[1].md5, "b");
+        assert_eq!(deduped[2].md5, "c");
+    }
 }
