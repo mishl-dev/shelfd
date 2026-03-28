@@ -18,7 +18,7 @@ default:
 
 # Start services (build if needed)
 up:
-    docker compose up --build
+    docker compose up --build -d
 
 # Stop services
 down:
@@ -36,7 +36,7 @@ rebuild:
 # Reset volumes + remove local images
 reset:
     docker compose down -v --rmi local
-    docker compose up --build
+    docker compose up --build -d
 
 # Follow logs
 logs:
