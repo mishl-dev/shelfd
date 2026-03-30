@@ -1,4 +1,5 @@
 use axum::Router;
+use tower_http::compression::CompressionLayer;
 use tower_http::trace::TraceLayer;
 
 use crate::http::cover::handle_cover;
@@ -28,6 +29,7 @@ pub fn build_app(state: AppState) -> Router {
         .route("/opds/search", get(handle_search))
         .route("/opds/cover/{md5}", get(handle_cover))
         .route("/opds/download/{md5}", get(handle_download))
+        .layer(CompressionLayer::new())
         .layer(TraceLayer::new_for_http())
         .with_state(state)
 }

@@ -22,7 +22,7 @@ pub async fn fetch_top_explore_entries(state: &AppState) -> anyhow::Result<Vec<E
         .collect();
     let subject_results: Vec<_> = stream::iter(subjects.into_iter())
         .map(|subject| async move { fetch_subject_entries(state, &subject, 50).await })
-        .buffer_unordered(3)
+        .buffer_unordered(6)
         .collect()
         .await;
 

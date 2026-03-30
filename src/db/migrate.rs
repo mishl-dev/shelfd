@@ -88,6 +88,12 @@ pub async fn run_migrations(pool: &SqlitePool) -> Result<()> {
     )
     .execute(pool)
     .await?;
+    sqlx::query("CREATE INDEX IF NOT EXISTS idx_links_md5_failed ON links(md5, failed)")
+        .execute(pool)
+        .await?;
+    sqlx::query("CREATE INDEX IF NOT EXISTS idx_books_md5_cached_at ON books(md5, cached_at)")
+        .execute(pool)
+        .await?;
 
     info!("sqlite migrations complete");
     Ok(())
