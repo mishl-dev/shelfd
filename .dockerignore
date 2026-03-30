@@ -7,3 +7,4 @@
 target
 opds.db
 test_outputs
+.cargo

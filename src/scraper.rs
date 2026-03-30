@@ -1,4 +1,4 @@
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 // Use the external `scraper` crate via its full path to avoid name clash with this module.
 use scraper::{Html, Selector};
 
@@ -80,29 +80,6 @@ pub fn parse_search_results(html: &str) -> Vec<RawEntry> {
 /// Detect whether the archive returned a search error (e.g. page limit exceeded).
 pub fn has_search_error(html: &str) -> bool {
     html.contains("Error during search.")
-}
-
-/// Remove `<script>` blocks so debug logs show mostly semantic markup.
-#[allow(dead_code)]
-pub fn strip_script_tags(html: &str) -> String {
-    let mut out = String::with_capacity(html.len());
-    let mut rest = html;
-
-    loop {
-        let Some(start) = rest.find("<script") else {
-            out.push_str(rest);
-            break;
-        };
-
-        out.push_str(&rest[..start]);
-        let after_start = &rest[start..];
-        let Some(end_rel) = after_start.find("</script>") else {
-            break;
-        };
-        rest = &after_start[end_rel + "</script>".len()..];
-    }
-
-    out
 }
 
 /// Extract the download URL from the slow_download page.
@@ -202,21 +179,5 @@ mod tests {
         let url = parse_download_url(html).unwrap();
 
         assert_eq!(url, "https://cdn.example.com/file.pdf");
-    }
-
-    #[test]
-    fn strip_script_tags_removes_script_blocks() {
-        let html = r#"
-        <html>
-          <head><script>console.log("x")</script></head>
-          <body><div>keep me</div><script src="/app.js"></script></body>
-        </html>
-        "#;
-
-        let stripped = strip_script_tags(html);
-
-        assert!(stripped.contains("<div>keep me</div>"));
-        assert!(!stripped.contains("console.log"));
-        assert!(!stripped.contains("src=\"/app.js\""));
     }
 }

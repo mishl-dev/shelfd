@@ -2,7 +2,6 @@ use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 use std::sync::{Arc, OnceLock};
 
-
 use rand::rngs::StdRng;
 use rand::{Rng, RngExt, SeedableRng};
 use resvg::usvg::{Options, Tree, fontdb};
@@ -82,10 +81,6 @@ struct TitleSpec {
 struct TitleMetrics {
     font_size: u32,
     last_baseline: f32,
-}
-
-fn load_palettes() -> &'static [Palette] {
-    shared_palettes()
 }
 
 fn escape_xml(s: &str) -> String {
@@ -313,12 +308,6 @@ fn bezier_blob_at(
     format!(r#"<path d="{d}" fill="{acc}" opacity="{opacity:.2}"/>"#)
 }
 
-
-
-pub(super) fn grain_overlay(_opacity: f32) -> String {
-    String::new()
-}
-
 fn svg_document(defs: &str, body: &str) -> String {
     format!(
         r#"<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 {WIDTH} {HEIGHT}" width="{WIDTH}" height="{HEIGHT}"><defs>{defs}</defs>{body}</svg>"#
@@ -350,7 +339,7 @@ fn render_svg(svg: &str) -> anyhow::Result<Vec<u8>> {
 }
 
 pub fn render_cover(title: &str, author: &str) -> anyhow::Result<Vec<u8>> {
-    let palettes = load_palettes();
+    let palettes = shared_palettes();
     let seed = {
         let mut hasher = DefaultHasher::new();
         title.hash(&mut hasher);
@@ -394,7 +383,7 @@ mod tests {
 
     #[test]
     fn test_palettes_load() {
-        let palettes = load_palettes();
+        let palettes = shared_palettes();
         assert!(palettes.len() >= 20);
         assert!(!palettes[0].bg.is_empty());
         assert!(!palettes[0].grad_a.is_empty());
@@ -420,7 +409,7 @@ mod tests {
 
     #[test]
     fn test_template_svg_generation() {
-        let palettes = load_palettes();
+        let palettes = shared_palettes();
         let palette = &palettes[0];
 
         for (idx, template) in TemplateKind::ALL.into_iter().enumerate() {
@@ -463,7 +452,7 @@ mod tests {
 
     #[test]
     fn test_generate_all_template_samples() {
-        let palettes = load_palettes();
+        let palettes = shared_palettes();
 
         for (idx, template) in TemplateKind::ALL.into_iter().enumerate() {
             let mut rng = StdRng::seed_from_u64(10_000 + idx as u64);
@@ -477,7 +466,7 @@ mod tests {
 
     #[test]
     fn test_generate_all_template_samples_long_title() {
-        let palettes = load_palettes();
+        let palettes = shared_palettes();
         let title = "The Return of the King: Being the Third Part of The Lord of the Rings";
         let author = "J.R.R. Tolkien";
 
