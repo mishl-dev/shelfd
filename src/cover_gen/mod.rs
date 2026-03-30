@@ -1,6 +1,7 @@
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
+
 
 use rand::rngs::StdRng;
 use rand::{Rng, RngExt, SeedableRng};
@@ -16,6 +17,26 @@ static PALETTES_TOML: &str = include_str!("../../assets/palettes.toml");
 static FONT_REGULAR: &[u8] = include_bytes!("../../assets/fonts/Lora/Lora-VariableFont_wght.ttf");
 static FONT_ITALIC: &[u8] =
     include_bytes!("../../assets/fonts/Lora/Lora-Italic-VariableFont_wght.ttf");
+
+fn shared_fontdb() -> Arc<fontdb::Database> {
+    static DB: OnceLock<Arc<fontdb::Database>> = OnceLock::new();
+    DB.get_or_init(|| {
+        let mut db = fontdb::Database::new();
+        db.load_font_data(FONT_REGULAR.to_vec());
+        db.load_font_data(FONT_ITALIC.to_vec());
+        Arc::new(db)
+    })
+    .clone()
+}
+
+fn shared_palettes() -> &'static [Palette] {
+    static PALETTES: OnceLock<Vec<Palette>> = OnceLock::new();
+    PALETTES.get_or_init(|| {
+        let data: PaletteFile =
+            toml::from_str(PALETTES_TOML).expect("failed to parse palettes.toml");
+        data.palette
+    })
+}
 
 const WIDTH: u32 = 400;
 const HEIGHT: u32 = 600;
@@ -63,9 +84,8 @@ struct TitleMetrics {
     last_baseline: f32,
 }
 
-fn load_palettes() -> Vec<Palette> {
-    let data: PaletteFile = toml::from_str(PALETTES_TOML).expect("failed to parse palettes.toml");
-    data.palette
+fn load_palettes() -> &'static [Palette] {
+    shared_palettes()
 }
 
 fn escape_xml(s: &str) -> String {
@@ -186,58 +206,6 @@ fn line_fits_width(line: &str, font_size: u32, max_width: f32, letter_spacing: f
     estimated_width <= target_width
 }
 
-fn title_fits_box(lines: &[String], spec: TitleSpec, font_size: u32) -> bool {
-    let line_gap = font_size as f32 * 1.12;
-    let anchor = match spec.align {
-        TextAlign::Left => "start",
-        TextAlign::Center => "middle",
-    };
-    let measure_width = WIDTH * 4;
-    let measure_height = HEIGHT * 2;
-    let measure_x = match spec.align {
-        TextAlign::Left => 24.0,
-        TextAlign::Center => measure_width as f32 / 2.0,
-    };
-    let measure_y = 80.0;
-    let first_baseline = if spec.center_block {
-        measure_y - (line_gap * (lines.len().saturating_sub(1) as f32)) / 2.0
-    } else {
-        measure_y
-    };
-
-    let mut block = format!(
-        r#"<text x="{:.1}" y="{:.1}" font-family="'Lora','Georgia',serif" font-size="{}" font-weight="700" fill='white' letter-spacing="{:.1}" text-anchor="{}">"#,
-        measure_x, first_baseline, font_size, spec.letter_spacing, anchor
-    );
-
-    for (idx, line) in lines.iter().enumerate() {
-        let dy = if idx == 0 { 0.0 } else { line_gap };
-        block.push_str(&format!(
-            r#"<tspan x="{:.1}" dy="{:.1}">{}</tspan>"#,
-            measure_x,
-            dy,
-            escape_xml(line)
-        ));
-    }
-    block.push_str("</text>");
-
-    let svg = format!(
-        r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {measure_width} {measure_height}" width="{measure_width}" height="{measure_height}">{block}</svg>"#
-    );
-
-    let Ok(pixmap) = render_svg_pixmap(&svg) else {
-        return false;
-    };
-    let Some((measured_width, measured_height)) = measure_nontransparent_bounds(&pixmap) else {
-        return true;
-    };
-
-    let target_width = (spec.max_width - 28.0).max(spec.max_width * 0.78);
-    let target_height = (spec.max_height - 8.0).max(spec.max_height * 0.85);
-
-    measured_width as f32 <= target_width && measured_height as f32 <= target_height
-}
-
 fn render_title(lines: &[String], spec: TitleSpec, fill: &str) -> (String, TitleMetrics) {
     let line_count = lines.len().max(1) as f32;
     let size_from_height = (spec.max_height / (1.0 + 1.12 * (line_count - 1.0))).floor() as u32;
@@ -249,10 +217,9 @@ fn render_title(lines: &[String], spec: TitleSpec, fill: &str) -> (String, Title
     let mut font_size = max_candidate.max(spec.min_size);
 
     while font_size > spec.min_size
-        && (!lines
+        && !lines
             .iter()
             .all(|line| line_fits_width(line, font_size, spec.max_width, spec.letter_spacing))
-            || !title_fits_box(lines, spec, font_size))
     {
         font_size -= 1;
     }
@@ -346,24 +313,21 @@ fn bezier_blob_at(
     format!(r#"<path d="{d}" fill="{acc}" opacity="{opacity:.2}"/>"#)
 }
 
-fn grain_overlay(opacity: f32) -> String {
-    let boosted = (opacity * 1.45).min(0.14);
-    format!(r#"<rect width="{WIDTH}" height="{HEIGHT}" filter="url(#grain)" opacity="{boosted:.2}"/>"#)
+
+
+pub(super) fn grain_overlay(_opacity: f32) -> String {
+    String::new()
 }
 
 fn svg_document(defs: &str, body: &str) -> String {
     format!(
-        r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {WIDTH} {HEIGHT}" width="{WIDTH}" height="{HEIGHT}"><defs><filter id="grain" x="0%" y="0%" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="4" stitchTiles="stitch"/><feColorMatrix type="saturate" values="0"/></filter>{defs}</defs>{body}</svg>"#
+        r#"<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 {WIDTH} {HEIGHT}" width="{WIDTH}" height="{HEIGHT}"><defs>{defs}</defs>{body}</svg>"#
     )
 }
 
 fn render_svg_pixmap(svg: &str) -> anyhow::Result<Pixmap> {
-    let mut fontdb = fontdb::Database::new();
-    fontdb.load_font_data(FONT_REGULAR.to_vec());
-    fontdb.load_font_data(FONT_ITALIC.to_vec());
-
     let opts = Options {
-        fontdb: Arc::new(fontdb),
+        fontdb: shared_fontdb(),
         ..Options::default()
     };
     let tree = Tree::from_str(svg, &opts)?;
@@ -383,33 +347,6 @@ fn render_svg(svg: &str) -> anyhow::Result<Vec<u8>> {
     pixmap
         .encode_png()
         .map_err(|e| anyhow::anyhow!("failed to encode PNG: {e}"))
-}
-
-fn measure_nontransparent_bounds(pixmap: &Pixmap) -> Option<(u32, u32)> {
-    let width = pixmap.width();
-    let height = pixmap.height();
-    let data = pixmap.data();
-
-    let mut min_x = width;
-    let mut max_x = 0;
-    let mut min_y = height;
-    let mut max_y = 0;
-    let mut found = false;
-
-    for y in 0..height {
-        for x in 0..width {
-            let idx = ((y * width + x) * 4 + 3) as usize;
-            if data[idx] > 0 {
-                found = true;
-                min_x = min_x.min(x);
-                max_x = max_x.max(x);
-                min_y = min_y.min(y);
-                max_y = max_y.max(y);
-            }
-        }
-    }
-
-    found.then_some((max_x - min_x + 1, max_y - min_y + 1))
 }
 
 pub fn render_cover(title: &str, author: &str) -> anyhow::Result<Vec<u8>> {

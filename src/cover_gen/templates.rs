@@ -1,8 +1,8 @@
 use rand::{Rng, RngExt};
 
 use super::{
-    HEIGHT, Palette, TextAlign, TitleSpec, author_text, bezier_blob_at, escape_xml,
-    grain_overlay, initial_letter, render_title, svg_document, wave_path, WIDTH,
+    author_text, bezier_blob_at, escape_xml, grain_overlay, initial_letter, render_title,
+    svg_document, wave_path, Palette, TextAlign, TitleSpec, HEIGHT, WIDTH,
 };
 
 #[derive(Clone, Copy, Debug)]
@@ -56,7 +56,18 @@ pub(super) fn render_template(
             );
             let (title_block, metrics) = render_title(
                 &lines,
-                TitleSpec { x: 36.0, y: 320.0, max_width: 320.0, max_height: 150.0, align: TextAlign::Left, center_block: false, min_size: 22, max_size: 74, single_line_max: 86, letter_spacing: 6.0 },
+                TitleSpec {
+                    x: 36.0,
+                    y: 320.0,
+                    max_width: 320.0,
+                    max_height: 150.0,
+                    align: TextAlign::Left,
+                    center_block: false,
+                    min_size: 22,
+                    max_size: 74,
+                    single_line_max: 86,
+                    letter_spacing: 6.0,
+                },
                 &p.fg,
             );
             let divider_y = metrics.last_baseline + metrics.font_size as f32 * 0.28;
@@ -81,7 +92,18 @@ pub(super) fn render_template(
             let base = rng.random_range(112.0..152.0);
             let (title_block, metrics) = render_title(
                 &lines,
-                TitleSpec { x: 36.0, y: 340.0, max_width: 290.0, max_height: 150.0, align: TextAlign::Left, center_block: false, min_size: 22, max_size: 70, single_line_max: 84, letter_spacing: 5.0 },
+                TitleSpec {
+                    x: 36.0,
+                    y: 340.0,
+                    max_width: 290.0,
+                    max_height: 150.0,
+                    align: TextAlign::Left,
+                    center_block: false,
+                    min_size: 22,
+                    max_size: 70,
+                    single_line_max: 84,
+                    letter_spacing: 5.0,
+                },
                 &p.fg,
             );
             let divider_y = metrics.last_baseline + metrics.font_size as f32 * 0.26;
@@ -103,7 +125,18 @@ pub(super) fn render_template(
             let bar_w = rng.random_range(250.0..320.0);
             let (title_block, metrics) = render_title(
                 &lines,
-                TitleSpec { x: 30.0, y: 310.0, max_width: 330.0, max_height: 150.0, align: TextAlign::Left, center_block: false, min_size: 22, max_size: 78, single_line_max: 88, letter_spacing: 4.0 },
+                TitleSpec {
+                    x: 30.0,
+                    y: 310.0,
+                    max_width: 330.0,
+                    max_height: 150.0,
+                    align: TextAlign::Left,
+                    center_block: false,
+                    min_size: 22,
+                    max_size: 78,
+                    single_line_max: 88,
+                    letter_spacing: 4.0,
+                },
                 &p.fg,
             );
             let divider_y = metrics.last_baseline + metrics.font_size as f32 * 0.28;
@@ -129,7 +162,18 @@ pub(super) fn render_template(
             let initial = escape_xml(&initial_letter(title));
             let (title_block, metrics) = render_title(
                 &lines,
-                TitleSpec { x: 40.0, y: 324.0, max_width: 310.0, max_height: 150.0, align: TextAlign::Left, center_block: false, min_size: 22, max_size: 72, single_line_max: 82, letter_spacing: 5.0 },
+                TitleSpec {
+                    x: 40.0,
+                    y: 324.0,
+                    max_width: 310.0,
+                    max_height: 150.0,
+                    align: TextAlign::Left,
+                    center_block: false,
+                    min_size: 22,
+                    max_size: 72,
+                    single_line_max: 82,
+                    letter_spacing: 5.0,
+                },
                 &p.fg,
             );
             let divider_y = metrics.last_baseline + metrics.font_size as f32 * 0.26;
@@ -153,7 +197,18 @@ pub(super) fn render_template(
             let blob2 = bezier_blob_at(rng, 200.0, 168.0, blob2_r, &p.acc, 0.10);
             let (title_block, metrics) = render_title(
                 &lines,
-                TitleSpec { x: 36.0, y: 432.0, max_width: 330.0, max_height: 132.0, align: TextAlign::Left, center_block: false, min_size: 20, max_size: 72, single_line_max: 82, letter_spacing: 4.0 },
+                TitleSpec {
+                    x: 36.0,
+                    y: 432.0,
+                    max_width: 330.0,
+                    max_height: 132.0,
+                    align: TextAlign::Left,
+                    center_block: false,
+                    min_size: 20,
+                    max_size: 72,
+                    single_line_max: 82,
+                    letter_spacing: 4.0,
+                },
                 &p.fg,
             );
             let divider_y = metrics.last_baseline + metrics.font_size as f32 * 0.24;
@@ -175,7 +230,18 @@ pub(super) fn render_template(
         TemplateKind::CornerOrnaments => {
             let (title_block, metrics) = render_title(
                 &lines,
-                TitleSpec { x: 200.0, y: 320.0, max_width: 280.0, max_height: 138.0, align: TextAlign::Center, center_block: true, min_size: 20, max_size: 72, single_line_max: 82, letter_spacing: 5.0 },
+                TitleSpec {
+                    x: 200.0,
+                    y: 320.0,
+                    max_width: 280.0,
+                    max_height: 138.0,
+                    align: TextAlign::Center,
+                    center_block: true,
+                    min_size: 20,
+                    max_size: 72,
+                    single_line_max: 82,
+                    letter_spacing: 5.0,
+                },
                 &p.fg,
             );
             let divider_y = metrics.last_baseline + metrics.font_size as f32 * 0.26;
@@ -184,7 +250,14 @@ pub(super) fn render_template(
                 bg = p.bg,
                 acc = p.acc,
                 title = title_block,
-                author = author_text(author, 200.0, divider_y + 38.0, TextAlign::Center, &p.fg, 0.56),
+                author = author_text(
+                    author,
+                    200.0,
+                    divider_y + 38.0,
+                    TextAlign::Center,
+                    &p.fg,
+                    0.56
+                ),
                 grain = grain_overlay(0.05)
             );
             svg_document("", &body)
@@ -192,7 +265,18 @@ pub(super) fn render_template(
         TemplateKind::WaveStack => {
             let (title_block, metrics) = render_title(
                 &lines,
-                TitleSpec { x: 36.0, y: 430.0, max_width: 330.0, max_height: 112.0, align: TextAlign::Left, center_block: false, min_size: 20, max_size: 72, single_line_max: 82, letter_spacing: 5.0 },
+                TitleSpec {
+                    x: 36.0,
+                    y: 430.0,
+                    max_width: 330.0,
+                    max_height: 112.0,
+                    align: TextAlign::Left,
+                    center_block: false,
+                    min_size: 20,
+                    max_size: 72,
+                    single_line_max: 82,
+                    letter_spacing: 5.0,
+                },
                 &p.fg,
             );
             let divider_y = metrics.last_baseline + metrics.font_size as f32 * 0.24;
@@ -228,7 +312,18 @@ pub(super) fn render_template(
             );
             let (title_block, metrics) = render_title(
                 &lines,
-                TitleSpec { x: 200.0, y: 378.0, max_width: 300.0, max_height: 132.0, align: TextAlign::Center, center_block: true, min_size: 20, max_size: 72, single_line_max: 82, letter_spacing: 5.0 },
+                TitleSpec {
+                    x: 200.0,
+                    y: 378.0,
+                    max_width: 300.0,
+                    max_height: 132.0,
+                    align: TextAlign::Center,
+                    center_block: true,
+                    min_size: 20,
+                    max_size: 72,
+                    single_line_max: 82,
+                    letter_spacing: 5.0,
+                },
                 &p.fg,
             );
             let band_y = 280.0 + rng.random_range(-18.0..18.0);
@@ -250,7 +345,18 @@ pub(super) fn render_template(
             let c3 = (200.0, 300.0, 108.0);
             let (title_block, metrics) = render_title(
                 &lines,
-                TitleSpec { x: 36.0, y: 460.0, max_width: 330.0, max_height: 120.0, align: TextAlign::Left, center_block: false, min_size: 18, max_size: 72, single_line_max: 82, letter_spacing: 5.0 },
+                TitleSpec {
+                    x: 36.0,
+                    y: 460.0,
+                    max_width: 330.0,
+                    max_height: 120.0,
+                    align: TextAlign::Left,
+                    center_block: false,
+                    min_size: 18,
+                    max_size: 72,
+                    single_line_max: 82,
+                    letter_spacing: 5.0,
+                },
                 &p.fg,
             );
             let divider_y = metrics.last_baseline + metrics.font_size as f32 * 0.24;
@@ -259,9 +365,15 @@ pub(super) fn render_template(
                 r#"<rect width="{WIDTH}" height="{HEIGHT}" fill="{bg}"/><circle cx="{x1}" cy="{y1}" r="{r1}" fill="{acc}" opacity="0.12"/><circle cx="{x2}" cy="{y2}" r="{r2}" fill="{acc}" opacity="0.10"/><circle cx="{x3}" cy="{y3}" r="{r3}" fill="{acc}" opacity="0.08"/><circle cx="{x1}" cy="{y1}" r="{r1}" fill="none" stroke="{acc}" stroke-width="1.2" opacity="0.30"/><circle cx="{x2}" cy="{y2}" r="{r2}" fill="none" stroke="{acc}" stroke-width="1.2" opacity="0.24"/>{title}<line x1="36" y1="{divider_y:.1}" x2="364" y2="{divider_y:.1}" stroke="{acc}" stroke-width="1.1" opacity="0.52"/>{author}{grain}"#,
                 bg = p.grad_a,
                 acc = p.acc,
-                x1 = c1.0, y1 = c1.1, r1 = c1.2,
-                x2 = c2.0, y2 = c2.1, r2 = c2.2,
-                x3 = c3.0, y3 = c3.1, r3 = c3.2,
+                x1 = c1.0,
+                y1 = c1.1,
+                r1 = c1.2,
+                x2 = c2.0,
+                y2 = c2.1,
+                r2 = c2.2,
+                x3 = c3.0,
+                y3 = c3.1,
+                r3 = c3.2,
                 title = title_block,
                 author = author_text(author, 36.0, author_y, TextAlign::Left, &p.fg, 0.56),
                 grain = grain_overlay(0.06)
@@ -271,7 +383,18 @@ pub(super) fn render_template(
         TemplateKind::StackedChevrons => {
             let (title_block, metrics) = render_title(
                 &lines,
-                TitleSpec { x: 200.0, y: 460.0, max_width: 300.0, max_height: 118.0, align: TextAlign::Center, center_block: true, min_size: 18, max_size: 72, single_line_max: 82, letter_spacing: 5.0 },
+                TitleSpec {
+                    x: 200.0,
+                    y: 460.0,
+                    max_width: 300.0,
+                    max_height: 118.0,
+                    align: TextAlign::Center,
+                    center_block: true,
+                    min_size: 18,
+                    max_size: 72,
+                    single_line_max: 82,
+                    letter_spacing: 5.0,
+                },
                 &p.fg,
             );
             let divider_y = metrics.last_baseline + metrics.font_size as f32 * 0.26;
@@ -298,7 +421,18 @@ pub(super) fn render_template(
         TemplateKind::LayeredObliques => {
             let (title_block, metrics) = render_title(
                 &lines,
-                TitleSpec { x: 36.0, y: 470.0, max_width: 330.0, max_height: 126.0, align: TextAlign::Left, center_block: false, min_size: 18, max_size: 72, single_line_max: 82, letter_spacing: 5.0 },
+                TitleSpec {
+                    x: 36.0,
+                    y: 470.0,
+                    max_width: 330.0,
+                    max_height: 126.0,
+                    align: TextAlign::Left,
+                    center_block: false,
+                    min_size: 18,
+                    max_size: 72,
+                    single_line_max: 82,
+                    letter_spacing: 5.0,
+                },
                 &p.fg,
             );
             let divider_y = metrics.last_baseline + metrics.font_size as f32 * 0.24;
