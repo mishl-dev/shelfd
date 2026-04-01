@@ -32,27 +32,15 @@ pub async fn run_migrations(pool: &SqlitePool) -> Result<()> {
     .execute(pool)
     .await?;
 
-    add_column_if_missing(pool, "ALTER TABLE books ADD COLUMN media_type TEXT").await?;
-    add_column_if_missing(
-        pool,
-        "ALTER TABLE books ADD COLUMN cover_checked_at INTEGER",
-    )
-    .await?;
-    add_column_if_missing(
-        pool,
-        "ALTER TABLE books ADD COLUMN first_publish_year INTEGER",
-    )
-    .await?;
-    add_column_if_missing(pool, "ALTER TABLE books ADD COLUMN language TEXT").await?;
-    add_column_if_missing(pool, "ALTER TABLE books ADD COLUMN subjects_json TEXT").await?;
-    add_column_if_missing(pool, "ALTER TABLE books ADD COLUMN description TEXT").await?;
-    add_column_if_missing(pool, "ALTER TABLE links ADD COLUMN media_type TEXT").await?;
-    add_column_if_missing(
-        pool,
-        "ALTER TABLE links ADD COLUMN failed INTEGER NOT NULL DEFAULT 0",
-    )
-    .await?;
-    add_column_if_missing(pool, "ALTER TABLE links ADD COLUMN failure_reason TEXT").await?;
+    add_column_if_missing(pool, "books", "media_type", "TEXT").await?;
+    add_column_if_missing(pool, "books", "cover_checked_at", "INTEGER").await?;
+    add_column_if_missing(pool, "books", "first_publish_year", "INTEGER").await?;
+    add_column_if_missing(pool, "books", "language", "TEXT").await?;
+    add_column_if_missing(pool, "books", "subjects_json", "TEXT").await?;
+    add_column_if_missing(pool, "books", "description", "TEXT").await?;
+    add_column_if_missing(pool, "links", "media_type", "TEXT").await?;
+    add_column_if_missing(pool, "links", "failed", "INTEGER NOT NULL DEFAULT 0").await?;
+    add_column_if_missing(pool, "links", "failure_reason", "TEXT").await?;
 
     sqlx::query(
         "CREATE TABLE IF NOT EXISTS searches (
@@ -99,12 +87,28 @@ pub async fn run_migrations(pool: &SqlitePool) -> Result<()> {
     Ok(())
 }
 
-async fn add_column_if_missing(pool: &SqlitePool, sql: &str) -> Result<()> {
-    match sqlx::query(sql).execute(pool).await {
-        Ok(_) => Ok(()),
-        Err(sqlx::Error::Database(error)) if error.message().contains("duplicate column name") => {
-            Ok(())
-        }
-        Err(error) => Err(error.into()),
+async fn add_column_if_missing(
+    pool: &SqlitePool,
+    table: &str,
+    column: &str,
+    col_type: &str,
+) -> Result<()> {
+    let exists: (i64,) = sqlx::query_as(
+        "SELECT COUNT(*) FROM pragma_table_info(?) WHERE name = ?",
+    )
+    .bind(table)
+    .bind(column)
+    .fetch_one(pool)
+    .await?;
+
+    if exists.0 == 0 {
+        sqlx::query(&format!(
+            "ALTER TABLE {} ADD COLUMN {} {}",
+            table, column, col_type
+        ))
+        .execute(pool)
+        .await?;
     }
+
+    Ok(())
 }

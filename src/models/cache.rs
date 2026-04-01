@@ -5,8 +5,6 @@ use super::{BookEntry, ExploreEntry};
 #[derive(Debug, Clone)]
 pub struct CachedBook {
     pub entry: BookEntry,
-    #[allow(dead_code)]
-    pub cached_at: i64,
 }
 
 #[derive(Debug, Clone)]

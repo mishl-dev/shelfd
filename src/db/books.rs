@@ -22,6 +22,10 @@ type CachedBookRow = (
 );
 
 pub async fn upsert_books(pool: &SqlitePool, books: &[BookEntry]) -> Result<()> {
+    if books.is_empty() {
+        return Ok(());
+    }
+
     let now = now_unix();
     debug!(
         count = books.len(),
@@ -30,43 +34,66 @@ pub async fn upsert_books(pool: &SqlitePool, books: &[BookEntry]) -> Result<()> 
     );
     let mut tx = pool.begin().await?;
 
-    for b in books {
-        let subjects_json = if b.subjects.is_empty() {
-            None
-        } else {
-            Some(serde_json::to_string(&b.subjects)?)
-        };
-        sqlx::query(
-            "INSERT INTO books (md5, title, author, downloads, cover_url, media_type, cover_checked_at, cached_at, first_publish_year, language, subjects_json, description)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)
-             ON CONFLICT(md5) DO UPDATE SET
-               title      = excluded.title,
-               author     = excluded.author,
-               downloads  = excluded.downloads,
-               cover_url  = excluded.cover_url,
-               media_type = COALESCE(excluded.media_type, books.media_type),
-               cover_checked_at = COALESCE(excluded.cover_checked_at, books.cover_checked_at),
-               cached_at  = excluded.cached_at,
-               first_publish_year = COALESCE(excluded.first_publish_year, books.first_publish_year),
-               language = COALESCE(excluded.language, books.language),
-               subjects_json = COALESCE(excluded.subjects_json, books.subjects_json),
-               description = COALESCE(excluded.description, books.description)",
-        )
-        .bind(&b.md5)
-        .bind(&b.title)
-        .bind(&b.author)
-        .bind(b.downloads)
-        .bind(&b.cover_url)
-        .bind(&b.download_media_type)
-        .bind(b.cover_checked_at)
-        .bind(now)
-        .bind(b.first_publish_year)
-        .bind(&b.language)
-        .bind(&subjects_json)
-        .bind(&b.description)
-        .execute(&mut *tx)
-        .await?;
-    }
+    let prepared: Vec<_> = books
+        .iter()
+        .map(|book| {
+            let subjects_json = if book.subjects.is_empty() {
+                None
+            } else {
+                Some(serde_json::to_string(&book.subjects).ok())
+            };
+            (
+                &book.md5,
+                &book.title,
+                &book.author,
+                book.downloads,
+                &book.cover_url,
+                &book.download_media_type,
+                book.cover_checked_at,
+                now,
+                book.first_publish_year,
+                &book.language,
+                subjects_json,
+                &book.description,
+            )
+        })
+        .collect();
+
+    let mut builder = QueryBuilder::<Sqlite>::new(
+        "INSERT INTO books (md5, title, author, downloads, cover_url, media_type, cover_checked_at, cached_at, first_publish_year, language, subjects_json, description) ",
+    );
+
+    builder.push_values(&prepared, |mut b, row| {
+        b.push_bind(row.0)
+            .push_bind(row.1)
+            .push_bind(row.2)
+            .push_bind(row.3)
+            .push_bind(row.4)
+            .push_bind(row.5)
+            .push_bind(row.6)
+            .push_bind(row.7)
+            .push_bind(row.8)
+            .push_bind(row.9)
+            .push_bind(&row.10)
+            .push_bind(row.11);
+    });
+
+    builder.push(
+        " ON CONFLICT(md5) DO UPDATE SET
+           title      = excluded.title,
+           author     = excluded.author,
+           downloads  = excluded.downloads,
+           cover_url  = excluded.cover_url,
+           media_type = COALESCE(excluded.media_type, books.media_type),
+           cover_checked_at = COALESCE(excluded.cover_checked_at, books.cover_checked_at),
+           cached_at  = excluded.cached_at,
+           first_publish_year = COALESCE(excluded.first_publish_year, books.first_publish_year),
+           language = COALESCE(excluded.language, books.language),
+           subjects_json = COALESCE(excluded.subjects_json, books.subjects_json),
+           description = COALESCE(excluded.description, books.description)",
+    );
+
+    builder.build().execute(&mut *tx).await?;
 
     tx.commit().await?;
     debug!(count = books.len(), "book upsert transaction committed");
@@ -128,7 +155,7 @@ fn cached_book_from_row(
         cover_url,
         download_media_type,
         cover_checked_at,
-        cached_at,
+        _cached_at,
         first_publish_year,
         language,
         subjects_json,
@@ -151,6 +178,5 @@ fn cached_book_from_row(
                 .unwrap_or_default(),
             description,
         },
-        cached_at,
     }
 }

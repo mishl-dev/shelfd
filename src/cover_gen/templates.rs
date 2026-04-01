@@ -1,8 +1,8 @@
 use rand::{Rng, RngExt};
 
 use super::{
-    author_text, bezier_blob_at, escape_xml, initial_letter, render_title, svg_document, wave_path,
-    Palette, TextAlign, TitleSpec, HEIGHT, WIDTH,
+    HEIGHT, Palette, TextAlign, TitleSpec, WIDTH, author_text, bezier_blob_at, escape_xml,
+    initial_letter, render_title, svg_document, wave_path,
 };
 
 #[derive(Clone, Copy, Debug)]

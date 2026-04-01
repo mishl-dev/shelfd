@@ -1,6 +1,6 @@
 use quick_xml::{
-    Writer,
     events::{BytesDecl, BytesEnd, BytesStart, Event},
+    Writer,
 };
 use std::io::Cursor;
 
@@ -11,9 +11,9 @@ use crate::{
 
 use super::links::{absolute_url, extract_cover_id, search_page_path};
 use super::xml::{
-    DEFAULT_ACQ_TYPE, OPDS_CT_ACQ, OPDS_CT_NAV, OPENSEARCH_CT, OPENSEARCH_NS, empty_elem_with_attrs,
-    end_feed, feed_author, finish, generator, link, now_rfc3339, simple_elem_with_attrs,
-    start_feed, text_elem, text_elem_with_attrs, writer,
+    empty_elem_with_attrs, end_feed, feed_author, finish, generator, link, now_rfc3339,
+    simple_elem_with_attrs, start_feed, text_elem, text_elem_with_attrs, writer, DEFAULT_ACQ_TYPE,
+    OPDS_CT_ACQ, OPDS_CT_NAV, OPENSEARCH_CT, OPENSEARCH_NS,
 };
 
 pub struct PaginationPaths {
@@ -25,7 +25,6 @@ pub struct PaginationPaths {
     pub total_items: usize,
 }
 
-#[allow(clippy::too_many_arguments)]
 pub fn search_feed(
     query: &str,
     books: &[BookEntry],
@@ -141,7 +140,10 @@ pub(crate) fn root_navigation_feed(
         subjects,
         app_name,
         app_name,
-        Some(&format!("Browse and search {} through {}.", archive_name, app_name)),
+        Some(&format!(
+            "Browse and search {} through {}.",
+            archive_name, app_name
+        )),
     )
 }
 
@@ -468,7 +470,10 @@ fn explore_entry(
         "href",
         absolute_url(
             public_base_url,
-            &format!("/opds/search?q={}", urlencoding::encode(&entry.search_query)),
+            &format!(
+                "/opds/search?q={}",
+                urlencoding::encode(&entry.search_query)
+            ),
         )
         .as_str(),
     ));
@@ -600,7 +605,16 @@ mod tests {
             description: None,
         }];
 
-        let xml = search_feed("dune", &books, 2, true, None, "shelfd", "Archive", "https://example.com");
+        let xml = search_feed(
+            "dune",
+            &books,
+            2,
+            true,
+            None,
+            "shelfd",
+            "Archive",
+            "https://example.com",
+        );
 
         assert!(xml.contains("rel=\"next\""));
         assert!(xml.contains("/opds/search?q=dune&amp;page=3"));
@@ -610,8 +624,7 @@ mod tests {
 
     #[test]
     fn open_search_description_points_to_search_template() {
-        let xml =
-            build_open_search_description(Some("http://localhost:7451"), "shelfd", "Archive");
+        let xml = build_open_search_description(Some("http://localhost:7451"), "shelfd", "Archive");
 
         assert!(xml.contains("OpenSearchDescription"));
         assert!(xml.contains("template=\"http://localhost:7451/opds/search?q={searchTerms}\""));

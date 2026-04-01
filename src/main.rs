@@ -1,7 +1,4 @@
-use std::sync::Arc;
-
 use anyhow::Result;
-use dashmap::DashMap;
 use tokio::net::TcpListener;
 use tracing::info;
 
@@ -17,15 +14,37 @@ mod scraper;
 mod service;
 mod state;
 
-use clap::Parser;
 use app::{build_app, build_http_client, build_sqlite_pool};
+use clap::Parser;
 use config::{
-    Cli, Command, ServeArgs, init_tracing, load_config, parse_explore_subjects,
-    print_startup_summary,
+    Cli, Command, ServeArgs, init_tracing, load_config, print_startup_summary,
 };
-use flaresolverr::FlareSolverrClient;
 use models::CacheTtls;
-use state::{AppMetrics, AppState};
+use state::AppState;
+
+async fn shutdown_signal() {
+    let ctrl_c = async {
+        tokio::signal::ctrl_c()
+            .await
+            .expect("failed to install Ctrl+C handler");
+    };
+
+    #[cfg(unix)]
+    let terminate = async {
+        tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
+            .expect("failed to install SIGTERM handler")
+            .recv()
+            .await;
+    };
+
+    #[cfg(not(unix))]
+    let terminate = std::future::pending::<()>();
+
+    tokio::select! {
+        _ = ctrl_c => {},
+        _ = terminate => {},
+    }
+}
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -47,56 +66,8 @@ async fn main() -> Result<()> {
     info!(database_url = %config.database_url, "connecting to sqlite");
     let pool = build_sqlite_pool(&config.database_url).await?;
     db::run_migrations(&pool).await?;
-    let explore_subjects = Arc::new(parse_explore_subjects(&config.explore_subjects_raw));
-    let subject_name_by_slug = Arc::new(
-        explore_subjects
-            .iter()
-            .map(|s| (s.slug.clone(), s.name.clone()))
-            .collect::<std::collections::HashMap<_, _>>(),
-    );
     let http = build_http_client()?;
-
-    let state = AppState {
-        fs: Arc::new(FlareSolverrClient::new(
-            http.clone(),
-            config.flaresolverr_url.clone(),
-            config.flaresolverr_session.clone(),
-        )),
-        pool: Arc::new(pool),
-        http,
-        archive_base: config.archive_base.clone(),
-        archive_bases: Arc::new(if config.archive_bases.is_empty() {
-            vec![config.archive_base.clone()]
-        } else {
-            config.archive_bases.clone()
-        }),
-        archive_rr: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
-        archive_name: config.archive_name.clone(),
-        app_name: config.app_name.clone(),
-        metadata_base_url: config.metadata_base_url.clone(),
-        public_base_url: config.public_base_url.clone(),
-        search_cache_ttl_secs: config.search_cache_ttl_secs,
-        book_cache_ttl_secs: config.book_cache_ttl_secs,
-        link_cache_ttl_secs: config.link_cache_ttl_secs,
-        link_failure_ttl_secs: config.link_failure_ttl_secs,
-        explore_cache_ttl_secs: config.explore_cache_ttl_secs,
-        cover_negative_ttl_secs: config.cover_negative_ttl_secs,
-        search_result_limit: config.search_result_limit,
-        explore_page_size: config.explore_page_size,
-        cover_lookup_limit: config.cover_lookup_limit,
-        inline_info_concurrency: config.inline_info_concurrency,
-        cover_lookup_concurrency: config.cover_lookup_concurrency,
-        search_prewarm_count: config.search_prewarm_count,
-        upstream_retry_attempts: config.upstream_retry_attempts,
-        upstream_retry_backoff_ms: config.upstream_retry_backoff_ms,
-        explore_subjects,
-        subject_name_by_slug,
-        metrics: Arc::new(AppMetrics::default()),
-        search_inflight: Arc::new(DashMap::new()),
-        download_inflight: Arc::new(DashMap::new()),
-        cover_inflight: Arc::new(DashMap::new()),
-        hot_cover_resolutions: Arc::new(DashMap::new()),
-    };
+    let state = AppState::new(&config, pool, http);
 
     let cache_ttls = CacheTtls {
         books_secs: config.book_cache_ttl_secs,
@@ -135,7 +106,6 @@ async fn main() -> Result<()> {
         explore_page_size = config.explore_page_size,
         cover_lookup_limit = config.cover_lookup_limit,
         inline_info_concurrency = config.inline_info_concurrency,
-        cover_lookup_concurrency = config.cover_lookup_concurrency,
         search_prewarm_count = config.search_prewarm_count,
         upstream_retry_attempts = config.upstream_retry_attempts,
         upstream_retry_backoff_ms = config.upstream_retry_backoff_ms,
@@ -148,7 +118,9 @@ async fn main() -> Result<()> {
 
     let listener = TcpListener::bind(&config.bind_addr).await?;
     tracing::info!("listening on {}", config.bind_addr);
-    axum::serve(listener, app).await?;
+    axum::serve(listener, app)
+        .with_graceful_shutdown(shutdown_signal())
+        .await?;
     Ok(())
 }
 
@@ -156,43 +128,31 @@ async fn main() -> Result<()> {
 mod tests {
     use super::*;
     use axum::{
+        Router,
         body::{Body, to_bytes},
         http::{Request, StatusCode, header},
-        Router,
     };
-    use sqlx::sqlite::SqlitePoolOptions;
     use tower::util::ServiceExt;
 
-    use crate::config::parse_explore_subjects;
+    use crate::config::AppConfig;
     use crate::models::BookEntry;
     use crate::service::retry::retry_backoff;
     use crate::service::search::sort_books_for_query;
-    use crate::state::{AppMetrics, AppState};
 
-    async fn test_app() -> Router {
-        let pool = SqlitePoolOptions::new()
-            .max_connections(1)
-            .connect("sqlite::memory:")
-            .await
-            .unwrap();
-        db::run_migrations(&pool).await.unwrap();
-        let http = build_http_client().unwrap();
-
-        let state = AppState {
-            fs: Arc::new(FlareSolverrClient::new(
-                http.clone(),
-                "http://127.0.0.1:8191".to_owned(),
-                "test-session".to_owned(),
-            )),
-            pool: Arc::new(pool),
-            http,
+    fn test_config() -> AppConfig {
+        AppConfig {
+            database_url: "sqlite::memory:".to_owned(),
+            bind_addr: "0.0.0.0:0".to_owned(),
             archive_base: "https://example.com".to_owned(),
-            archive_bases: Arc::new(vec!["https://example.com".to_owned()]),
-            archive_rr: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
+            archive_bases: vec!["https://example.com".to_owned()],
             archive_name: "Archive".to_owned(),
             app_name: "shelfd".to_owned(),
             metadata_base_url: "https://openlibrary.org".to_owned(),
+            flaresolverr_url: "http://127.0.0.1:8191".to_owned(),
+            flaresolverr_session: "test-session".to_owned(),
             public_base_url: Some("http://localhost:7451".to_owned()),
+            rust_log: "warn".to_owned(),
+            log_style: crate::config::LogStyle::Compact,
             search_cache_ttl_secs: 1800,
             book_cache_ttl_secs: 86400,
             link_cache_ttl_secs: 86400,
@@ -207,22 +167,17 @@ mod tests {
             search_prewarm_count: 3,
             upstream_retry_attempts: 2,
             upstream_retry_backoff_ms: 150,
-            explore_subjects: Arc::new(parse_explore_subjects("science_fiction,fantasy")),
-            subject_name_by_slug: Arc::new(
-                [
-                    ("science_fiction".to_owned(), "Science Fiction".to_owned()),
-                    ("fantasy".to_owned(), "Fantasy".to_owned()),
-                ]
-                .into_iter()
-                .collect(),
-            ),
-            metrics: Arc::new(AppMetrics::default()),
-            search_inflight: Arc::new(DashMap::new()),
-            download_inflight: Arc::new(DashMap::new()),
-            cover_inflight: Arc::new(DashMap::new()),
-            hot_cover_resolutions: Arc::new(DashMap::new()),
-        };
+            cleanup_interval_secs: 3600,
+            explore_subjects_raw: "science_fiction,fantasy".to_owned(),
+        }
+    }
 
+    async fn test_app() -> Router {
+        let config = test_config();
+        let pool = app::build_sqlite_pool(&config.database_url).await.unwrap();
+        db::run_migrations(&pool).await.unwrap();
+        let http = build_http_client().unwrap();
+        let state = AppState::new(&config, pool, http);
         build_app(state)
     }
 
@@ -307,7 +262,7 @@ mod tests {
     }
 
     #[test]
-    fn ranking_prefers_downloads_over_text_relevance() {
+    fn ranking_uses_downloads_as_primary_sort_key() {
         let mut books = vec![
             BookEntry {
                 md5: "1".to_owned(),
@@ -343,7 +298,7 @@ mod tests {
     }
 
     #[test]
-    fn ranking_uses_downloads_as_tiebreaker_for_similar_matches() {
+    fn ranking_sorts_by_downloads_when_text_relevance_is_equal() {
         let mut books = vec![
             BookEntry {
                 md5: "1".to_owned(),

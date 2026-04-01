@@ -1,6 +1,41 @@
-use anyhow::{anyhow, Result};
-// Use the external `scraper` crate via its full path to avoid name clash with this module.
+use anyhow::{Result, anyhow};
 use scraper::{Html, Selector};
+use std::sync::OnceLock;
+
+fn row_sel() -> &'static Selector {
+    static SEL: OnceLock<Selector> = OnceLock::new();
+    SEL.get_or_init(|| Selector::parse("div.border-b").unwrap())
+}
+
+fn title_sel() -> &'static Selector {
+    static SEL: OnceLock<Selector> = OnceLock::new();
+    SEL.get_or_init(|| Selector::parse("a.js-vim-focus[href^='/md5/']").unwrap())
+}
+
+fn author_sel() -> &'static Selector {
+    static SEL: OnceLock<Selector> = OnceLock::new();
+    SEL.get_or_init(|| Selector::parse("a[href*='search?q=']").unwrap())
+}
+
+fn user_icon_sel() -> &'static Selector {
+    static SEL: OnceLock<Selector> = OnceLock::new();
+    SEL.get_or_init(|| Selector::parse("span[class*='mdi--user-edit']").unwrap())
+}
+
+fn span_break_all_sel() -> &'static Selector {
+    static SEL: OnceLock<Selector> = OnceLock::new();
+    SEL.get_or_init(|| Selector::parse("span.break-all").unwrap())
+}
+
+fn link_sel() -> &'static Selector {
+    static SEL: OnceLock<Selector> = OnceLock::new();
+    SEL.get_or_init(|| Selector::parse("a[href]").unwrap())
+}
+
+fn any_break_sel() -> &'static Selector {
+    static SEL: OnceLock<Selector> = OnceLock::new();
+    SEL.get_or_init(|| Selector::parse(".break-all").unwrap())
+}
 
 /// Parsed search result before we fetch inline metadata.
 pub struct RawEntry {
@@ -12,15 +47,15 @@ pub struct RawEntry {
 /// Parse archive search results page.
 pub fn parse_search_results(html: &str) -> Vec<RawEntry> {
     let doc = Html::parse_document(html);
-    let row_sel = sel("div.border-b");
-    let title_sel = sel("a.js-vim-focus[href^='/md5/']");
-    let author_sel = sel("a[href*='search?q=']");
-    let user_icon_sel = sel("span[class*='mdi--user-edit']");
+    let row_sel = row_sel();
+    let title_sel = title_sel();
+    let author_sel = author_sel();
+    let user_icon_sel = user_icon_sel();
 
     let entries: Vec<_> = doc
-        .select(&row_sel)
+        .select(row_sel)
         .filter_map(|row| {
-            let title_node = row.select(&title_sel).next()?;
+            let title_node = row.select(title_sel).next()?;
             let href = title_node.value().attr("href")?;
             let md5 = href.strip_prefix("/md5/")?.trim().to_owned();
             if md5.is_empty() {
@@ -31,9 +66,9 @@ pub fn parse_search_results(html: &str) -> Vec<RawEntry> {
                 return None;
             }
             let author = row
-                .select(&author_sel)
-                .find(|n| n.select(&user_icon_sel).next().is_some())
-                .or_else(|| row.select(&author_sel).next())
+                .select(author_sel)
+                .find(|n| n.select(user_icon_sel).next().is_some())
+                .or_else(|| row.select(author_sel).next())
                 .map(|n| n.text().collect::<String>().trim().to_owned())
                 .unwrap_or_default();
 
@@ -45,11 +80,11 @@ pub fn parse_search_results(html: &str) -> Vec<RawEntry> {
         return entries;
     }
 
-    let title_nodes: Vec<_> = doc.select(&title_sel).collect();
-    let author_nodes: Vec<_> = doc.select(&author_sel).collect();
+    let title_nodes: Vec<_> = doc.select(title_sel).collect();
+    let author_nodes: Vec<_> = doc.select(author_sel).collect();
     let preferred_author_nodes: Vec<_> = author_nodes
         .iter()
-        .filter(|n| n.select(&user_icon_sel).next().is_some())
+        .filter(|n| n.select(user_icon_sel).next().is_some())
         .cloned()
         .collect();
 
@@ -85,19 +120,19 @@ pub fn has_search_error(html: &str) -> bool {
 /// Extract the download URL from the slow_download page.
 pub fn parse_download_url(html: &str) -> Result<String> {
     let doc = Html::parse_document(html);
-    let span_sel = sel("span.break-all");
-    let link_sel = sel("a[href]");
-    let any_break_sel = sel(".break-all");
+    let span_sel = span_break_all_sel();
+    let link_sel = link_sel();
+    let any_break_sel = any_break_sel();
 
     let mut candidates = doc
-        .select(&span_sel)
+        .select(span_sel)
         .map(|el| el.text().collect::<String>().trim().to_owned())
         .chain(
-            doc.select(&link_sel)
+            doc.select(link_sel)
                 .filter_map(|el| el.value().attr("href").map(str::to_owned)),
         )
         .chain(
-            doc.select(&any_break_sel)
+            doc.select(any_break_sel)
                 .map(|el| el.text().collect::<String>().trim().to_owned()),
         );
 
@@ -122,11 +157,6 @@ fn first_http_url(html: &str) -> Option<String> {
         .unwrap_or(tail.len());
     let candidate = tail[..end].trim();
     looks_like_download_url(candidate).then(|| candidate.to_owned())
-}
-
-/// Panic-free selector construction; panics only in debug on bad literals.
-fn sel(css: &'static str) -> Selector {
-    Selector::parse(css).unwrap_or_else(|e| panic!("bad selector `{css}`: {e:?}"))
 }
 
 #[cfg(test)]

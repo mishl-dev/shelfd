@@ -205,7 +205,9 @@ fn render_title(lines: &[String], spec: TitleSpec, fill: &str) -> (String, Title
     let line_count = lines.len().max(1) as f32;
     let size_from_height = (spec.max_height / (1.0 + 1.12 * (line_count - 1.0))).floor() as u32;
     let max_candidate = if lines.len() <= 1 {
-        size_from_height.min(spec.single_line_max).min(spec.max_size)
+        size_from_height
+            .min(spec.single_line_max)
+            .min(spec.max_size)
     } else {
         size_from_height.min(spec.max_size)
     };
@@ -403,7 +405,12 @@ mod tests {
         assert!(lines.len() >= 2);
         assert!(lines.len() <= 5);
         for line in &lines {
-            assert!(line.len() <= 45, "line too long ({} chars): {}", line.len(), line);
+            assert!(
+                line.len() <= 45,
+                "line too long ({} chars): {}",
+                line.len(),
+                line
+            );
         }
     }
 

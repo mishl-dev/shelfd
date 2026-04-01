@@ -8,6 +8,7 @@ use reqwest::Client;
 use sqlx::SqlitePool;
 use tokio::sync::Notify;
 
+use crate::config::AppConfig;
 use crate::flaresolverr::FlareSolverrClient;
 
 #[derive(Clone)]
@@ -48,6 +49,53 @@ pub struct AppState {
 }
 
 impl AppState {
+    pub fn new(config: &AppConfig, pool: SqlitePool, http: Client) -> Self {
+        let explore_subjects = Arc::new(config.explore_subjects());
+        let subject_name_by_slug = Arc::new(
+            explore_subjects
+                .iter()
+                .map(|s| (s.slug.clone(), s.name.clone()))
+                .collect::<HashMap<_, _>>(),
+        );
+        Self {
+            fs: Arc::new(FlareSolverrClient::new(
+                http.clone(),
+                config.flaresolverr_url.clone(),
+                config.flaresolverr_session.clone(),
+            )),
+            pool: Arc::new(pool),
+            http,
+            archive_base: config.archive_base.clone(),
+            archive_bases: Arc::new(config.archive_bases.clone()),
+            archive_rr: Arc::new(AtomicUsize::new(0)),
+            archive_name: config.archive_name.clone(),
+            app_name: config.app_name.clone(),
+            metadata_base_url: config.metadata_base_url.clone(),
+            public_base_url: config.public_base_url.clone(),
+            search_cache_ttl_secs: config.search_cache_ttl_secs,
+            book_cache_ttl_secs: config.book_cache_ttl_secs,
+            link_cache_ttl_secs: config.link_cache_ttl_secs,
+            link_failure_ttl_secs: config.link_failure_ttl_secs,
+            explore_cache_ttl_secs: config.explore_cache_ttl_secs,
+            cover_negative_ttl_secs: config.cover_negative_ttl_secs,
+            search_result_limit: config.search_result_limit,
+            explore_page_size: config.explore_page_size,
+            cover_lookup_limit: config.cover_lookup_limit,
+            inline_info_concurrency: config.inline_info_concurrency,
+            cover_lookup_concurrency: config.cover_lookup_concurrency,
+            search_prewarm_count: config.search_prewarm_count,
+            upstream_retry_attempts: config.upstream_retry_attempts,
+            upstream_retry_backoff_ms: config.upstream_retry_backoff_ms,
+            explore_subjects,
+            subject_name_by_slug,
+            metrics: Arc::new(AppMetrics::default()),
+            search_inflight: Arc::new(DashMap::new()),
+            download_inflight: Arc::new(DashMap::new()),
+            cover_inflight: Arc::new(DashMap::new()),
+            hot_cover_resolutions: Arc::new(DashMap::new()),
+        }
+    }
+
     pub fn next_archive_base(&self) -> &str {
         if self.archive_bases.len() <= 1 {
             return &self.archive_bases[0];

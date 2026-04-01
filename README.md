@@ -57,7 +57,8 @@ docker compose down
 
   The defaults are enough to get started, but these are the settings you will most likely care about:
 
-  - `ARCHIVE_BASE`: where your upstream archive lives
+  - `ARCHIVE_URLS`: comma-separated archive base URLs for round-robin racing
+  - `ARCHIVE_BASE`: fallback single archive URL (used if `ARCHIVE_URLS` is not set)
   - `ARCHIVE_NAME`: display name shown in feeds
   - `APP_NAME`: app name shown to OPDS clients
   - `PUBLIC_BASE_URL`: public base URL for generated links

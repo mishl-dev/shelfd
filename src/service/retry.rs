@@ -1,12 +1,21 @@
-use std::sync::atomic::Ordering;
-
 use anyhow::Context;
+use backoff::backoff::Backoff;
+use backoff::ExponentialBackoffBuilder;
+use std::sync::atomic::Ordering;
+use tokio::time::{Duration, sleep};
 use tracing::{debug, trace, warn};
 
 use crate::state::AppState;
 
-use tokio::time::{Duration, sleep};
+fn make_backoff(state: &AppState) -> backoff::ExponentialBackoff {
+    ExponentialBackoffBuilder::new()
+        .with_initial_interval(Duration::from_millis(state.upstream_retry_backoff_ms))
+        .with_multiplier(2.0)
+        .with_max_elapsed_time(None)
+        .build()
+}
 
+#[cfg_attr(not(test), allow(dead_code))]
 pub fn retry_backoff(base_ms: u64, attempt: usize) -> Duration {
     let multiplier = 1_u64 << attempt.saturating_sub(1).min(5);
     Duration::from_millis(base_ms.saturating_mul(multiplier))
@@ -22,7 +31,10 @@ pub async fn get_text_raced(
         return get_text_with_retry(state, &url, label).await;
     }
 
-    trace!(instances = state.archive_bases.len(), "racing archive text request");
+    trace!(
+        instances = state.archive_bases.len(),
+        "racing archive text request"
+    );
 
     let mut handles: Vec<_> = state
         .archive_bases
@@ -32,7 +44,9 @@ pub async fn get_text_raced(
             let http = state.http.clone();
             tokio::spawn(async move {
                 let resp = http.get(&url).send().await?;
-                resp.error_for_status()?.text().await
+                resp.error_for_status()?
+                    .text()
+                    .await
                     .with_context(|| format!("{label} body read failed"))
             })
         })
@@ -58,6 +72,7 @@ pub async fn get_text_with_retry(
     label: &'static str,
 ) -> anyhow::Result<String> {
     let attempts = state.upstream_retry_attempts.max(1);
+    let mut backoff = make_backoff(state);
     let mut last_error = None;
 
     trace!(attempts, "starting upstream text retries");
@@ -83,19 +98,18 @@ pub async fn get_text_with_retry(
             }
         }
 
-        if attempt < attempts {
+        if let Some(duration) = backoff.next_backoff() {
             state
                 .metrics
                 .upstream_retries
                 .fetch_add(1, Ordering::Relaxed);
-            let backoff = retry_backoff(state.upstream_retry_backoff_ms, attempt);
             warn!(
                 attempt,
-                backoff_ms = backoff.as_millis(),
+                backoff_ms = duration.as_millis(),
                 label,
                 "retrying upstream text request"
             );
-            sleep(backoff).await;
+            sleep(duration).await;
         }
     }
 
@@ -111,6 +125,7 @@ where
     T: serde::de::DeserializeOwned,
 {
     let attempts = state.upstream_retry_attempts.max(1);
+    let mut backoff = make_backoff(state);
     let mut last_error = None;
 
     trace!(attempts, "starting upstream json retries");
@@ -138,19 +153,18 @@ where
             }
         }
 
-        if attempt < attempts {
+        if let Some(duration) = backoff.next_backoff() {
             state
                 .metrics
                 .upstream_retries
                 .fetch_add(1, Ordering::Relaxed);
-            let backoff = retry_backoff(state.upstream_retry_backoff_ms, attempt);
             warn!(
                 attempt,
-                backoff_ms = backoff.as_millis(),
+                backoff_ms = duration.as_millis(),
                 label,
                 "retrying upstream JSON request"
             );
-            sleep(backoff).await;
+            sleep(duration).await;
         }
     }
 
@@ -162,6 +176,7 @@ pub async fn get_flaresolverr_html_with_retry(
     url: &str,
 ) -> anyhow::Result<String> {
     let attempts = state.upstream_retry_attempts.max(1);
+    let mut backoff = make_backoff(state);
     let mut last_error = None;
 
     for attempt in 1..=attempts {
@@ -170,18 +185,17 @@ pub async fn get_flaresolverr_html_with_retry(
             Err(error) => last_error = Some(error),
         }
 
-        if attempt < attempts {
+        if let Some(duration) = backoff.next_backoff() {
             state
                 .metrics
                 .upstream_retries
                 .fetch_add(1, Ordering::Relaxed);
-            let backoff = retry_backoff(state.upstream_retry_backoff_ms, attempt);
             warn!(
                 attempt,
-                backoff_ms = backoff.as_millis(),
+                backoff_ms = duration.as_millis(),
                 "retrying FlareSolverr request"
             );
-            sleep(backoff).await;
+            sleep(duration).await;
         }
     }
 

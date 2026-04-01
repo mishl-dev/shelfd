@@ -4,6 +4,7 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use serde::Deserialize;
+use std::sync::atomic::Ordering;
 
 use crate::opds;
 use crate::state::AppState;
@@ -19,8 +20,6 @@ pub struct ExploreParams {
 }
 
 pub async fn handle_explore_root(State(state): State<AppState>) -> Response {
-    use std::sync::atomic::Ordering;
-
     state.metrics.requests_total.fetch_add(1, Ordering::Relaxed);
     (
         [
@@ -45,8 +44,6 @@ pub async fn handle_explore_top(
     State(state): State<AppState>,
     Query(params): Query<ExploreParams>,
 ) -> Response {
-    use std::sync::atomic::Ordering;
-
     state.metrics.requests_total.fetch_add(1, Ordering::Relaxed);
     let page = params.page.unwrap_or(1).max(1);
     match fetch_top_explore_entries(&state).await {
@@ -88,16 +85,13 @@ pub async fn handle_explore_subject(
     axum::extract::Path(subject): axum::extract::Path<String>,
     Query(params): Query<ExploreParams>,
 ) -> Response {
-    use std::sync::atomic::Ordering;
-
     state.metrics.requests_total.fetch_add(1, Ordering::Relaxed);
     let Some(subject_name) = explore_subject_name(&state, &subject) else {
         return (StatusCode::NOT_FOUND, "unknown subject").into_response();
     };
     let page = params.page.unwrap_or(1).max(1);
 
-    let fetch_limit = (page * state.explore_page_size).clamp(state.explore_page_size, 250);
-    match fetch_subject_entries(&state, &subject, fetch_limit).await {
+    match fetch_subject_entries(&state, &subject, 250).await {
         Ok(entries) => {
             let page_entries = paginate_entries(&entries, page, state.explore_page_size);
             (

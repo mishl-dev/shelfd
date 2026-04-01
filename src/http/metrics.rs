@@ -56,7 +56,10 @@ pub async fn handle_metrics(State(state): State<AppState>) -> Response {
         requests_total: state.metrics.requests_total.load(Ordering::Relaxed),
         searches_total: state.metrics.searches_total.load(Ordering::Relaxed),
         search_cache_hits: state.metrics.search_cache_hits.load(Ordering::Relaxed),
-        search_result_books_seen: state.metrics.search_result_books_seen.load(Ordering::Relaxed),
+        search_result_books_seen: state
+            .metrics
+            .search_result_books_seen
+            .load(Ordering::Relaxed),
         search_book_cache_hits: state.metrics.search_book_cache_hits.load(Ordering::Relaxed),
         search_book_cache_misses: state
             .metrics
@@ -93,10 +96,7 @@ pub async fn handle_metrics(State(state): State<AppState>) -> Response {
             .metrics
             .cover_prewarm_jobs_completed
             .load(Ordering::Relaxed),
-        cover_prewarm_attempts: state
-            .metrics
-            .cover_prewarm_attempts
-            .load(Ordering::Relaxed),
+        cover_prewarm_attempts: state.metrics.cover_prewarm_attempts.load(Ordering::Relaxed),
         cover_prewarm_hits: state.metrics.cover_prewarm_hits.load(Ordering::Relaxed),
         cover_resolution_hot_hits: state
             .metrics

@@ -122,7 +122,9 @@ fn select_cover_url(docs: &[OlDoc]) -> Option<String> {
 
 fn cover_url_for_doc(doc: &OlDoc) -> Option<String> {
     if let Some(cover_i) = doc.cover_i {
-        return Some(format!("https://covers.openlibrary.org/b/id/{cover_i}-M.jpg"));
+        return Some(format!(
+            "https://covers.openlibrary.org/b/id/{cover_i}-M.jpg"
+        ));
     }
 
     if let Some(cover_edition_key) = doc.cover_edition_key.as_deref() {

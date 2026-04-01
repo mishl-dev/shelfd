@@ -32,15 +32,22 @@ impl Drop for InflightGuard {
 }
 
 pub async fn begin_inflight(map: Arc<DashMap<String, Arc<Notify>>>, key: String) -> InflightRole {
-    if let Some(existing) = map.get(&key) {
-        return InflightRole::Waiter(existing.clone());
-    }
+    use dashmap::mapref::entry::Entry;
 
-    let notify = Arc::new(Notify::new());
-    map.insert(key.clone(), notify.clone());
-    InflightRole::Leader(InflightGuard {
-        key,
-        map: map.clone(),
-        notify,
-    })
+    let map_for_guard = map.clone();
+    match map.entry(key.clone()) {
+        Entry::Occupied(e) => {
+            let notify = e.get().clone();
+            InflightRole::Waiter(notify)
+        }
+        Entry::Vacant(e) => {
+            let notify = Arc::new(Notify::new());
+            e.insert(notify.clone());
+            InflightRole::Leader(InflightGuard {
+                key,
+                map: map_for_guard,
+                notify,
+            })
+        }
+    }
 }

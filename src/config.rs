@@ -45,6 +45,12 @@ pub struct AppConfig {
     pub explore_subjects_raw: String,
 }
 
+impl AppConfig {
+    pub fn explore_subjects(&self) -> Vec<ExploreSubject> {
+        parse_explore_subjects(&self.explore_subjects_raw)
+    }
+}
+
 #[derive(Debug, Parser)]
 #[command(
     name = "shelfd",
@@ -72,9 +78,9 @@ pub struct ServeArgs {
     /// Override the bind address, for example 0.0.0.0:7451.
     #[arg(long, env = "BIND_ADDR")]
     pub bind_addr: Option<String>,
-    /// Override the archive base URL.
-    #[arg(long, env = "ARCHIVE_BASE")]
-    pub archive_base: Option<String>,
+    /// Override the archive base URLs (comma-separated for round-robin racing).
+    #[arg(long, env = "ARCHIVE_URLS")]
+    pub archive_urls: Option<String>,
     /// Override the archive display name used in OPDS feeds.
     #[arg(long, env = "ARCHIVE_NAME")]
     pub archive_name: Option<String>,
@@ -130,22 +136,34 @@ pub fn load_config(args: &ServeArgs) -> Result<AppConfig> {
             .unwrap_or_else(|| env_or("BIND_ADDR", "0.0.0.0:7070")),
         archive_bases: {
             let raw = args
-                .archive_base
+                .archive_urls
                 .clone()
-                .unwrap_or_else(|| env_or("ARCHIVE_URLS", ""));
-            if raw.is_empty() {
-                vec![env_or("ARCHIVE_BASE", "http://localhost:8080")]
+                .or_else(|| std::env::var("ARCHIVE_URLS").ok())
+                .unwrap_or_else(|| env_or("ARCHIVE_BASE", "http://localhost:8080"));
+            let bases: Vec<_> = raw
+                .split(',')
+                .map(|s| s.trim().trim_end_matches('/').to_owned())
+                .filter(|s| !s.is_empty())
+                .collect();
+            if bases.is_empty() {
+                vec!["http://localhost:8080".to_owned()]
             } else {
-                raw.split(',')
-                    .map(|s| s.trim().trim_end_matches('/').to_owned())
-                    .filter(|s| !s.is_empty())
-                    .collect()
+                bases
             }
         },
-        archive_base: args
-            .archive_base
-            .clone()
-            .unwrap_or_else(|| env_or("ARCHIVE_BASE", "http://localhost:8080")),
+        archive_base: {
+            let raw = args
+                .archive_urls
+                .clone()
+                .or_else(|| std::env::var("ARCHIVE_URLS").ok())
+                .unwrap_or_else(|| env_or("ARCHIVE_BASE", "http://localhost:8080"));
+            let first = raw
+                .split(',')
+                .map(|s| s.trim().trim_end_matches('/'))
+                .find(|s| !s.is_empty())
+                .unwrap_or("http://localhost:8080");
+            first.to_owned()
+        },
         archive_name: args
             .archive_name
             .clone()
@@ -258,13 +276,13 @@ pub fn init_tracing(config: &AppConfig) -> Result<()> {
 
 pub fn print_startup_summary(config: &AppConfig) {
     info!(
-        "{} starting\n  bind: {}\n  opds: http://{}/opds\n  flaresolverr: {}\n  archive: {} ({})\n  metadata: {}\n  explore subjects: {}\n  log style: {:?}",
+        "{} starting\n  bind: {}\n  opds: http://{}/opds\n  flaresolverr: {}\n  archives: {}\n  archive name: {}\n  metadata: {}\n  explore subjects: {}\n  log style: {:?}",
         config.app_name,
         config.bind_addr,
         display_host_for_summary(&config.bind_addr),
         config.flaresolverr_url,
+        config.archive_bases.join(", "),
         config.archive_name,
-        config.archive_base,
         config.metadata_base_url,
         config.explore_subjects_raw,
         config.log_style

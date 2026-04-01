@@ -9,20 +9,22 @@ use crate::state::AppState;
 use super::inflight::{InflightRole, begin_inflight};
 use super::retry::{get_flaresolverr_html_with_retry, log_sanitized_html};
 
-pub async fn resolve_download(state: &AppState, md5: &str) -> anyhow::Result<String> {
-    let success_min_cached_at = db::unix_now() - state.link_cache_ttl_secs;
-    let failure_min_cached_at = db::unix_now() - state.link_failure_ttl_secs;
+async fn check_cached_link(
+    pool: &sqlx::SqlitePool,
+    metrics: &crate::state::AppMetrics,
+    md5: &str,
+    success_min_cached_at: i64,
+    failure_min_cached_at: i64,
+) -> Result<Option<String>, anyhow::Error> {
     if let Some(cached) = db::get_cached_link(
-        &state.pool,
+        pool,
         md5,
         success_min_cached_at,
         failure_min_cached_at,
     )
-    .await?
-    {
+    .await? {
         if cached.failed {
-            state
-                .metrics
+            metrics
                 .download_failure_cache_hits
                 .fetch_add(1, Ordering::Relaxed);
             anyhow::bail!(
@@ -32,14 +34,28 @@ pub async fn resolve_download(state: &AppState, md5: &str) -> anyhow::Result<Str
                     .unwrap_or_else(|| "cached download resolution failure".to_owned())
             );
         }
-        state
-            .metrics
+        metrics
             .download_cache_hits
             .fetch_add(1, Ordering::Relaxed);
         info!(%md5, media_type = cached.media_type.as_deref().unwrap_or(""), cached_at = cached.cached_at, "download URL cache hit");
-        return cached
-            .download_url
-            .ok_or_else(|| anyhow::anyhow!("cached successful download entry missing URL"));
+        return Ok(cached.download_url);
+    }
+    Ok(None)
+}
+
+pub async fn resolve_download(state: &AppState, md5: &str) -> anyhow::Result<String> {
+    let success_min_cached_at = db::unix_now() - state.link_cache_ttl_secs;
+    let failure_min_cached_at = db::unix_now() - state.link_failure_ttl_secs;
+    if let Some(url) = check_cached_link(
+        &state.pool,
+        &state.metrics,
+        md5,
+        success_min_cached_at,
+        failure_min_cached_at,
+    )
+    .await?
+    {
+        return Ok(url);
     }
 
     let inflight = begin_inflight(state.download_inflight.clone(), md5.to_owned()).await;
@@ -48,34 +64,16 @@ pub async fn resolve_download(state: &AppState, md5: &str) -> anyhow::Result<Str
         InflightRole::Waiter(notify) => {
             info!(%md5, "waiting for in-flight download resolution");
             notify.notified().await;
-            if let Some(cached) = db::get_cached_link(
+            if let Some(url) = check_cached_link(
                 &state.pool,
+                &state.metrics,
                 md5,
                 success_min_cached_at,
                 failure_min_cached_at,
             )
             .await?
             {
-                if cached.failed {
-                    state
-                        .metrics
-                        .download_failure_cache_hits
-                        .fetch_add(1, Ordering::Relaxed);
-                    anyhow::bail!(
-                        "{}",
-                        cached
-                            .failure_reason
-                            .unwrap_or_else(|| "cached download resolution failure".to_owned())
-                    );
-                }
-                state
-                    .metrics
-                    .download_cache_hits
-                    .fetch_add(1, Ordering::Relaxed);
-                info!(%md5, media_type = cached.media_type.as_deref().unwrap_or(""), cached_at = cached.cached_at, "download URL cache hit after wait");
-                return cached.download_url.ok_or_else(|| {
-                    anyhow::anyhow!("cached successful download entry missing URL")
-                });
+                return Ok(url);
             }
             begin_inflight(state.download_inflight.clone(), md5.to_owned())
                 .await
