@@ -8,9 +8,7 @@ use crate::cover_gen::render_cover;
 use crate::db;
 use crate::service::inflight::{InflightRole, begin_inflight};
 use crate::service::metadata::enrich_book_metadata;
-use crate::state::{AppState, HotCoverResolution};
-
-const HOT_COVER_RESOLUTION_TTL_SECS: i64 = 300;
+use crate::state::AppState;
 
 pub async fn resolve_cover_response(state: &AppState, param: &str, size_suffix: &str) -> Response {
     if param.chars().all(|c| c.is_ascii_digit()) {
@@ -53,9 +51,9 @@ pub async fn resolve_cover_response(state: &AppState, param: &str, size_suffix: 
 
     let mut cover_url = book.as_ref().and_then(|b| b.cover_url.clone());
     let hot_resolution = if cover_url.is_none() {
-        get_hot_cover_resolution(state, param)
+        get_hot_cover_resolution(state, param).await
     } else {
-        cache_hot_cover_resolution(state, param, cover_url.clone());
+        cache_hot_cover_resolution(state, param, cover_url.clone()).await;
         None
     };
     if cover_url.is_none() && let Some(hot_cover_url) = hot_resolution.clone() {
@@ -82,7 +80,7 @@ pub async fn resolve_cover_response(state: &AppState, param: &str, size_suffix: 
             match inflight {
                 InflightRole::Leader(guard) => {
                     cover_url = enrich_book_metadata(state, param).await;
-                    cache_hot_cover_resolution(state, param, cover_url.clone());
+                    cache_hot_cover_resolution(state, param, cover_url.clone()).await;
                     drop(guard);
                 }
                 InflightRole::Waiter(notify) => {
@@ -93,7 +91,7 @@ pub async fn resolve_cover_response(state: &AppState, param: &str, size_suffix: 
                         _ => None,
                     };
                     cover_url = book.as_ref().and_then(|b| b.cover_url.clone());
-                    cache_hot_cover_resolution(state, param, cover_url.clone());
+                    cache_hot_cover_resolution(state, param, cover_url.clone()).await;
                 }
             }
         }
@@ -161,34 +159,15 @@ async fn fetch_cover_url(state: &AppState, cover_url: &str) -> Response {
     }
 }
 
-fn get_hot_cover_resolution(state: &AppState, md5: &str) -> Option<Option<String>> {
-    let now = db::unix_now();
-    if let Some(entry) = state.hot_cover_resolutions.get(md5)
-        && now - entry.cached_at <= HOT_COVER_RESOLUTION_TTL_SECS
-    {
-        state
-            .metrics
-            .cover_resolution_hot_hits
-            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-        return Some(entry.cover_url.clone());
-    }
-
-    state.hot_cover_resolutions.remove(md5);
-    state
-        .metrics
-        .cover_resolution_hot_misses
-        .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-    None
+async fn get_hot_cover_resolution(state: &AppState, md5: &str) -> Option<Option<String>> {
+    state.hot_cover_resolutions.get(md5).await
 }
 
-fn cache_hot_cover_resolution(state: &AppState, md5: &str, cover_url: Option<String>) {
-    state.hot_cover_resolutions.insert(
-        md5.to_owned(),
-        HotCoverResolution {
-            cover_url,
-            cached_at: db::unix_now(),
-        },
-    );
+async fn cache_hot_cover_resolution(state: &AppState, md5: &str, cover_url: Option<String>) {
+    state
+        .hot_cover_resolutions
+        .insert(md5.to_owned(), cover_url)
+        .await;
 }
 
 async fn generated_cover(title: &str, author: &str) -> Response {

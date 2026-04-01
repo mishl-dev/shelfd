@@ -1,25 +1,27 @@
 use anyhow::Result;
-use sqlx::{QueryBuilder, Sqlite, SqlitePool};
+use sqlx::{FromRow, QueryBuilder, Sqlite, SqlitePool};
 use tracing::debug;
 
 use crate::models::{BookEntry, CachedBook};
 
 use super::time::now_unix;
 
-type CachedBookRow = (
-    String,
-    String,
-    String,
-    i64,
-    Option<String>,
-    Option<String>,
-    Option<i64>,
-    i64,
-    Option<i64>,
-    Option<String>,
-    Option<String>,
-    Option<String>,
-);
+#[derive(Debug, FromRow)]
+struct CachedBookRow {
+    md5: String,
+    title: String,
+    author: String,
+    downloads: i64,
+    cover_url: Option<String>,
+    media_type: Option<String>,
+    cover_checked_at: Option<i64>,
+    #[allow(dead_code)]
+    cached_at: i64,
+    first_publish_year: Option<i64>,
+    language: Option<String>,
+    subjects_json: Option<String>,
+    description: Option<String>,
+}
 
 pub async fn upsert_books(pool: &SqlitePool, books: &[BookEntry]) -> Result<()> {
     if books.is_empty() {
@@ -146,37 +148,23 @@ pub async fn get_cached_books(
     Ok(rows.into_iter().map(cached_book_from_row).collect())
 }
 
-fn cached_book_from_row(
-    (
-        md5,
-        title,
-        author,
-        downloads,
-        cover_url,
-        download_media_type,
-        cover_checked_at,
-        _cached_at,
-        first_publish_year,
-        language,
-        subjects_json,
-        description,
-    ): CachedBookRow,
-) -> CachedBook {
+fn cached_book_from_row(row: CachedBookRow) -> CachedBook {
     CachedBook {
         entry: BookEntry {
-            md5,
-            title,
-            author,
-            downloads,
-            cover_url,
-            download_media_type,
-            cover_checked_at,
-            first_publish_year,
-            language,
-            subjects: subjects_json
+            md5: row.md5,
+            title: row.title,
+            author: row.author,
+            downloads: row.downloads,
+            cover_url: row.cover_url,
+            download_media_type: row.media_type,
+            cover_checked_at: row.cover_checked_at,
+            first_publish_year: row.first_publish_year,
+            language: row.language,
+            subjects: row
+                .subjects_json
                 .and_then(|json| serde_json::from_str(&json).ok())
                 .unwrap_or_default(),
-            description,
+            description: row.description,
         },
     }
 }

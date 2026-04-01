@@ -1,15 +1,19 @@
 use std::{
     collections::HashMap,
     sync::{atomic::AtomicU64, atomic::AtomicUsize, Arc},
+    time::Duration,
 };
 
 use dashmap::DashMap;
+use moka::future::Cache;
 use reqwest::Client;
 use sqlx::SqlitePool;
 use tokio::sync::Notify;
 
 use crate::config::AppConfig;
 use crate::flaresolverr::FlareSolverrClient;
+
+const HOT_COVER_RESOLUTION_TTL_SECS: u64 = 300;
 
 #[derive(Clone)]
 pub struct AppState {
@@ -45,7 +49,7 @@ pub struct AppState {
     pub search_inflight: Arc<DashMap<String, Arc<Notify>>>,
     pub download_inflight: Arc<DashMap<String, Arc<Notify>>>,
     pub cover_inflight: Arc<DashMap<String, Arc<Notify>>>,
-    pub hot_cover_resolutions: Arc<DashMap<String, HotCoverResolution>>,
+    pub hot_cover_resolutions: Arc<Cache<String, Option<String>>>,
 }
 
 impl AppState {
@@ -92,7 +96,11 @@ impl AppState {
             search_inflight: Arc::new(DashMap::new()),
             download_inflight: Arc::new(DashMap::new()),
             cover_inflight: Arc::new(DashMap::new()),
-            hot_cover_resolutions: Arc::new(DashMap::new()),
+            hot_cover_resolutions: Arc::new(
+                Cache::builder()
+                    .time_to_live(Duration::from_secs(HOT_COVER_RESOLUTION_TTL_SECS))
+                    .build(),
+            ),
         }
     }
 
@@ -139,10 +147,4 @@ pub struct AppMetrics {
 pub struct ExploreSubject {
     pub slug: String,
     pub name: String,
-}
-
-#[derive(Debug, Clone)]
-pub struct HotCoverResolution {
-    pub cover_url: Option<String>,
-    pub cached_at: i64,
 }
