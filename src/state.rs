@@ -1,6 +1,6 @@
 use std::{
     collections::HashMap,
-    sync::{atomic::AtomicU64, atomic::AtomicUsize, Arc},
+    sync::{Arc, atomic::AtomicU64, atomic::AtomicUsize},
     time::Duration,
 };
 

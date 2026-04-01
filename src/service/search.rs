@@ -95,9 +95,12 @@ pub async fn do_search(state: &AppState, query: &str, page: usize) -> anyhow::Re
         "fetching inline info with bounded concurrency"
     );
     let raw_md5s: Vec<_> = raw.iter().map(|entry| entry.md5.clone()).collect();
-    let cached_books =
-        db::get_cached_books(&state.pool, &raw_md5s, db::unix_now() - state.book_cache_ttl_secs)
-            .await?;
+    let cached_books = db::get_cached_books(
+        &state.pool,
+        &raw_md5s,
+        db::unix_now() - state.book_cache_ttl_secs,
+    )
+    .await?;
     let cached_by_md5: HashMap<_, _> = cached_books
         .into_iter()
         .map(|cached| (cached.entry.md5.clone(), cached.entry))
@@ -159,7 +162,11 @@ async fn resolve_book_entry(
         };
     }
 
-    let url = format!("{}/dyn/md5/inline_info/{}", state.next_archive_base(), entry.md5);
+    let url = format!(
+        "{}/dyn/md5/inline_info/{}",
+        state.next_archive_base(),
+        entry.md5
+    );
     let downloads = fetch_downloads(state, &url).await;
     debug!(downloads, "inline info resolved");
 

@@ -93,13 +93,11 @@ async fn add_column_if_missing(
     column: &str,
     col_type: &str,
 ) -> Result<()> {
-    let exists: (i64,) = sqlx::query_as(
-        "SELECT COUNT(*) FROM pragma_table_info(?) WHERE name = ?",
-    )
-    .bind(table)
-    .bind(column)
-    .fetch_one(pool)
-    .await?;
+    let exists: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM pragma_table_info(?) WHERE name = ?")
+        .bind(table)
+        .bind(column)
+        .fetch_one(pool)
+        .await?;
 
     if exists.0 == 0 {
         sqlx::query(&format!(

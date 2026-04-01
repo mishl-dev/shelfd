@@ -1,7 +1,7 @@
 use chrono::Utc;
 use quick_xml::{
-    events::{BytesDecl, BytesEnd, BytesStart, BytesText, Event},
     Writer,
+    events::{BytesDecl, BytesEnd, BytesStart, BytesText, Event},
 };
 use std::io::Cursor;
 

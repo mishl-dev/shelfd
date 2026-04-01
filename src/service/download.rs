@@ -16,13 +16,9 @@ async fn check_cached_link(
     success_min_cached_at: i64,
     failure_min_cached_at: i64,
 ) -> Result<Option<String>, anyhow::Error> {
-    if let Some(cached) = db::get_cached_link(
-        pool,
-        md5,
-        success_min_cached_at,
-        failure_min_cached_at,
-    )
-    .await? {
+    if let Some(cached) =
+        db::get_cached_link(pool, md5, success_min_cached_at, failure_min_cached_at).await?
+    {
         if cached.failed {
             metrics
                 .download_failure_cache_hits
@@ -34,9 +30,7 @@ async fn check_cached_link(
                     .unwrap_or_else(|| "cached download resolution failure".to_owned())
             );
         }
-        metrics
-            .download_cache_hits
-            .fetch_add(1, Ordering::Relaxed);
+        metrics.download_cache_hits.fetch_add(1, Ordering::Relaxed);
         info!(%md5, media_type = cached.media_type.as_deref().unwrap_or(""), cached_at = cached.cached_at, "download URL cache hit");
         return Ok(cached.download_url);
     }

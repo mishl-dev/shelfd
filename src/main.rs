@@ -16,9 +16,7 @@ mod state;
 
 use app::{build_app, build_http_client, build_sqlite_pool};
 use clap::Parser;
-use config::{
-    Cli, Command, ServeArgs, init_tracing, load_config, print_startup_summary,
-};
+use config::{Cli, Command, ServeArgs, init_tracing, load_config, print_startup_summary};
 use models::CacheTtls;
 use state::AppState;
 

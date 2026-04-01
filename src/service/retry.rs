@@ -1,6 +1,6 @@
 use anyhow::Context;
-use backoff::backoff::Backoff;
 use backoff::ExponentialBackoffBuilder;
+use backoff::backoff::Backoff;
 use std::sync::atomic::Ordering;
 use tokio::time::{Duration, sleep};
 use tracing::{debug, trace, warn};

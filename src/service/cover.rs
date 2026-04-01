@@ -56,7 +56,9 @@ pub async fn resolve_cover_response(state: &AppState, param: &str, size_suffix: 
         cache_hot_cover_resolution(state, param, cover_url.clone()).await;
         None
     };
-    if cover_url.is_none() && let Some(hot_cover_url) = hot_resolution.clone() {
+    if cover_url.is_none()
+        && let Some(hot_cover_url) = hot_resolution.clone()
+    {
         cover_url = hot_cover_url;
     }
 
@@ -97,7 +99,8 @@ pub async fn resolve_cover_response(state: &AppState, param: &str, size_suffix: 
         }
     }
 
-    let upstream_cover_url = cover_url.and_then(|url| openlibrary_cover_url_for_size(&url, size_suffix));
+    let upstream_cover_url =
+        cover_url.and_then(|url| openlibrary_cover_url_for_size(&url, size_suffix));
 
     match upstream_cover_url {
         Some(url) => match fetch_cover_url(state, &url).await {
@@ -115,7 +118,9 @@ pub fn openlibrary_cover_url_for_size(url: &str, size_suffix: &str) -> Option<St
     let path = url.strip_prefix("covers.openlibrary.org/")?;
     let path = path.split('?').next()?;
     let (prefix, _) = path.rsplit_once('-')?;
-    Some(format!("https://covers.openlibrary.org/{prefix}-{size_suffix}.jpg?default=false"))
+    Some(format!(
+        "https://covers.openlibrary.org/{prefix}-{size_suffix}.jpg?default=false"
+    ))
 }
 
 async fn fetch_cover_url(state: &AppState, cover_url: &str) -> Response {
@@ -134,8 +139,7 @@ async fn fetch_cover_url(state: &AppState, cover_url: &str) -> Response {
                             (header::CONTENT_TYPE, content_type),
                             (
                                 header::CACHE_CONTROL,
-                                "public, max-age=86400, stale-while-revalidate=604800"
-                                    .to_owned(),
+                                "public, max-age=86400, stale-while-revalidate=604800".to_owned(),
                             ),
                         ],
                         body,
@@ -182,10 +186,7 @@ async fn generated_cover(title: &str, author: &str) -> Response {
         Ok(Ok(png)) => (
             [
                 (header::CONTENT_TYPE, "image/png"),
-                (
-                    header::CACHE_CONTROL,
-                    "no-cache, no-store, must-revalidate",
-                ),
+                (header::CACHE_CONTROL, "no-cache, no-store, must-revalidate"),
             ],
             png,
         )
@@ -208,11 +209,8 @@ mod tests {
     #[test]
     fn rewrites_cover_id_urls_to_requested_size() {
         assert_eq!(
-            openlibrary_cover_url_for_size(
-                "https://covers.openlibrary.org/b/id/12345-M.jpg",
-                "L"
-            )
-            .as_deref(),
+            openlibrary_cover_url_for_size("https://covers.openlibrary.org/b/id/12345-M.jpg", "L")
+                .as_deref(),
             Some("https://covers.openlibrary.org/b/id/12345-L.jpg?default=false")
         );
     }
