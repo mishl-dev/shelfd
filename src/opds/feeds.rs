@@ -1,6 +1,6 @@
 use quick_xml::{
-    Writer,
     events::{BytesDecl, BytesEnd, BytesStart, Event},
+    Writer,
 };
 use std::io::Cursor;
 
@@ -11,9 +11,9 @@ use crate::{
 
 use super::links::{absolute_url, extract_cover_id, search_page_path};
 use super::xml::{
-    DEFAULT_ACQ_TYPE, OPDS_CT_ACQ, OPDS_CT_NAV, OPENSEARCH_CT, OPENSEARCH_NS,
     empty_elem_with_attrs, end_feed, feed_author, finish, generator, link, now_rfc3339,
-    simple_elem_with_attrs, start_feed, text_elem, text_elem_with_attrs, writer,
+    simple_elem_with_attrs, start_feed, text_elem, text_elem_with_attrs, writer, DEFAULT_ACQ_TYPE,
+    OPDS_CT_ACQ, OPDS_CT_NAV, OPENSEARCH_CT, OPENSEARCH_NS,
 };
 
 pub struct PaginationPaths {
@@ -25,6 +25,7 @@ pub struct PaginationPaths {
     pub total_items: usize,
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn search_feed(
     query: &str,
     books: &[BookEntry],

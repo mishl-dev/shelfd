@@ -227,10 +227,7 @@ mod tests {
 
     #[test]
     fn infer_media_type_no_extension() {
-        assert_eq!(
-            infer_media_type_from_url("https://example.com/file"),
-            None
-        );
+        assert_eq!(infer_media_type_from_url("https://example.com/file"), None);
     }
 
     #[test]

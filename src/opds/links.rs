@@ -11,11 +11,7 @@ pub fn extract_cover_id(url: &str) -> Option<&str> {
         .or_else(|| url.strip_prefix("http://"))?;
     let url = url.strip_prefix("covers.openlibrary.org/b/id/")?;
     let id = url.split('-').next()?;
-    if id.is_empty() {
-        None
-    } else {
-        Some(id)
-    }
+    if id.is_empty() { None } else { Some(id) }
 }
 
 pub fn search_page_path(query: &str, page: usize) -> String {
