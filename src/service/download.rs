@@ -128,3 +128,113 @@ pub fn infer_media_type_from_url(url: &str) -> Option<String> {
         None
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn infer_media_type_epub() {
+        assert_eq!(
+            infer_media_type_from_url("https://example.com/file.epub"),
+            Some("application/epub+zip".to_owned())
+        );
+    }
+
+    #[test]
+    fn infer_media_type_pdf() {
+        assert_eq!(
+            infer_media_type_from_url("https://example.com/file.pdf"),
+            Some("application/pdf".to_owned())
+        );
+    }
+
+    #[test]
+    fn infer_media_type_mobi() {
+        assert_eq!(
+            infer_media_type_from_url("https://example.com/file.mobi"),
+            Some("application/x-mobipocket-ebook".to_owned())
+        );
+    }
+
+    #[test]
+    fn infer_media_type_azw3() {
+        assert_eq!(
+            infer_media_type_from_url("https://example.com/file.azw3"),
+            Some("application/vnd.amazon.ebook".to_owned())
+        );
+    }
+
+    #[test]
+    fn infer_media_type_fb2() {
+        assert_eq!(
+            infer_media_type_from_url("https://example.com/file.fb2"),
+            Some("application/x-fictionbook+xml".to_owned())
+        );
+    }
+
+    #[test]
+    fn infer_media_type_djvu() {
+        assert_eq!(
+            infer_media_type_from_url("https://example.com/file.djvu"),
+            Some("image/vnd.djvu".to_owned())
+        );
+    }
+
+    #[test]
+    fn infer_media_type_djv() {
+        assert_eq!(
+            infer_media_type_from_url("https://example.com/file.djv"),
+            Some("image/vnd.djvu".to_owned())
+        );
+    }
+
+    #[test]
+    fn infer_media_type_txt() {
+        assert_eq!(
+            infer_media_type_from_url("https://example.com/file.txt"),
+            Some("text/plain".to_owned())
+        );
+    }
+
+    #[test]
+    fn infer_media_type_case_insensitive() {
+        assert_eq!(
+            infer_media_type_from_url("https://example.com/file.EPUB"),
+            Some("application/epub+zip".to_owned())
+        );
+        assert_eq!(
+            infer_media_type_from_url("https://example.com/file.Pdf"),
+            Some("application/pdf".to_owned())
+        );
+    }
+
+    #[test]
+    fn infer_media_type_with_query_params() {
+        assert_eq!(
+            infer_media_type_from_url("https://example.com/file.epub?token=abc"),
+            Some("application/epub+zip".to_owned())
+        );
+    }
+
+    #[test]
+    fn infer_media_type_unknown_extension() {
+        assert_eq!(
+            infer_media_type_from_url("https://example.com/file.xyz"),
+            None
+        );
+    }
+
+    #[test]
+    fn infer_media_type_no_extension() {
+        assert_eq!(
+            infer_media_type_from_url("https://example.com/file"),
+            None
+        );
+    }
+
+    #[test]
+    fn infer_media_type_empty_url() {
+        assert_eq!(infer_media_type_from_url(""), None);
+    }
+}

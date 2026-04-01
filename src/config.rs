@@ -358,3 +358,108 @@ fn prettify_subject_name(slug: &str) -> String {
             .join(" "),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn prettify_subject_name_special_cases() {
+        assert_eq!(
+            prettify_subject_name("mystery_and_detective_stories"),
+            "Mystery"
+        );
+        assert_eq!(
+            prettify_subject_name("young_adult_fiction"),
+            "Young Adult Fiction"
+        );
+        assert_eq!(prettify_subject_name("world_war_ii"), "World War II");
+        assert_eq!(prettify_subject_name("kids_books"), "Kids Books");
+        assert_eq!(
+            prettify_subject_name("stories_in_rhyme"),
+            "Stories in Rhyme"
+        );
+        assert_eq!(prettify_subject_name("self_help"), "Self-Help");
+        assert_eq!(prettify_subject_name("short_stories"), "Short Stories");
+        assert_eq!(
+            prettify_subject_name("computer_science"),
+            "Computer Science"
+        );
+        assert_eq!(prettify_subject_name("graphic_design"), "Graphic Design");
+        assert_eq!(
+            prettify_subject_name("historical_fiction"),
+            "Historical Fiction"
+        );
+    }
+
+    #[test]
+    fn prettify_subject_name_default_fallback() {
+        assert_eq!(prettify_subject_name("science_fiction"), "Science Fiction");
+        assert_eq!(prettify_subject_name("fantasy"), "Fantasy");
+        assert_eq!(prettify_subject_name("biology"), "Biology");
+        assert_eq!(prettify_subject_name("programming"), "Programming");
+    }
+
+    #[test]
+    fn prettify_subject_name_consecutive_underscores() {
+        assert_eq!(prettify_subject_name("foo__bar"), "Foo Bar");
+    }
+
+    #[test]
+    fn prettify_subject_name_empty_string() {
+        assert_eq!(prettify_subject_name(""), "");
+    }
+
+    #[test]
+    fn prettify_subject_name_single_word() {
+        assert_eq!(prettify_subject_name("horror"), "Horror");
+    }
+
+    #[test]
+    fn parse_explore_subjects_comma_separated() {
+        let subjects = parse_explore_subjects("science_fiction,fantasy,horror");
+        assert_eq!(subjects.len(), 3);
+        assert_eq!(subjects[0].slug, "science_fiction");
+        assert_eq!(subjects[0].name, "Science Fiction");
+        assert_eq!(subjects[1].slug, "fantasy");
+        assert_eq!(subjects[1].name, "Fantasy");
+    }
+
+    #[test]
+    fn parse_explore_subjects_empty_string_fallback() {
+        let subjects = parse_explore_subjects("");
+        assert_eq!(subjects.len(), 1);
+        assert_eq!(subjects[0].slug, "science_fiction");
+        assert_eq!(subjects[0].name, "Science Fiction");
+    }
+
+    #[test]
+    fn parse_explore_subjects_trims_whitespace() {
+        let subjects = parse_explore_subjects("  fantasy  ,  horror  ");
+        assert_eq!(subjects.len(), 2);
+        assert_eq!(subjects[0].slug, "fantasy");
+        assert_eq!(subjects[1].slug, "horror");
+    }
+
+    #[test]
+    fn parse_explore_subjects_filters_empty_items() {
+        let subjects = parse_explore_subjects("fantasy,,horror,");
+        assert_eq!(subjects.len(), 2);
+    }
+
+    #[test]
+    fn display_host_for_summary_replaces_0000() {
+        assert_eq!(display_host_for_summary("0.0.0.0:7070"), "127.0.0.1:7070");
+    }
+
+    #[test]
+    fn display_host_for_summary_other_address_unchanged() {
+        assert_eq!(display_host_for_summary("127.0.0.1:7070"), "127.0.0.1:7070");
+        assert_eq!(display_host_for_summary("localhost:7070"), "localhost:7070");
+    }
+
+    #[test]
+    fn display_host_for_summary_empty_string() {
+        assert_eq!(display_host_for_summary(""), "");
+    }
+}

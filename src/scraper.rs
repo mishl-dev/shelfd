@@ -1,4 +1,4 @@
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use scraper::{Html, Selector};
 use std::sync::OnceLock;
 
@@ -186,6 +186,86 @@ mod tests {
     }
 
     #[test]
+    fn parse_search_results_empty_html() {
+        let entries = parse_search_results("");
+        assert!(entries.is_empty());
+    }
+
+    #[test]
+    fn parse_search_results_filters_empty_md5() {
+        let html = r#"
+        <html><body>
+          <a class="js-vim-focus" href="/md5/">Empty MD5</a>
+          <a href="/search?q=author">Author</a>
+        </body></html>
+        "#;
+        let entries = parse_search_results(html);
+        assert!(entries.is_empty());
+    }
+
+    #[test]
+    fn parse_search_results_filters_empty_title() {
+        let html = r#"
+        <html><body>
+          <a class="js-vim-focus" href="/md5/abc123">   </a>
+          <a href="/search?q=author">Author</a>
+        </body></html>
+        "#;
+        let entries = parse_search_results(html);
+        assert!(entries.is_empty());
+    }
+
+    #[test]
+    fn parse_search_results_no_author_defaults_to_empty() {
+        let html = r#"
+        <html><body>
+          <a class="js-vim-focus" href="/md5/abc123">Book</a>
+        </body></html>
+        "#;
+        let entries = parse_search_results(html);
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].author, "");
+    }
+
+    #[test]
+    fn parse_search_results_fallback_path() {
+        let html = r#"
+        <html><body>
+          <a class="js-vim-focus" href="/md5/aaa111">Book A</a>
+          <a href="/search?q=authorA">Author A</a>
+          <a class="js-vim-focus" href="/md5/bbb222">Book B</a>
+          <a href="/search?q=authorB">Author B</a>
+        </body></html>
+        "#;
+
+        let entries = parse_search_results(html);
+        assert_eq!(entries.len(), 2);
+        assert_eq!(entries[0].md5, "aaa111");
+        assert_eq!(entries[0].title, "Book A");
+        assert_eq!(entries[1].md5, "bbb222");
+        assert_eq!(entries[1].title, "Book B");
+    }
+
+    #[test]
+    fn parse_search_results_prefers_author_with_user_icon() {
+        let html = r#"
+        <html><body>
+          <div class="border-b">
+            <a class="js-vim-focus" href="/md5/abc123">Book</a>
+            <a href="/search?q=editor">Editor</a>
+            <a href="/search?q=real_author">
+              <span class="mdi--user-edit-icon"></span>
+              Real Author
+            </a>
+          </div>
+        </body></html>
+        "#;
+        let entries = parse_search_results(html);
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].author, "Real Author");
+    }
+
+    #[test]
     fn parse_download_url_extracts_first_break_all_span() {
         let html = r#"
         <html><body>
@@ -194,7 +274,6 @@ mod tests {
         "#;
 
         let url = parse_download_url(html).unwrap();
-
         assert_eq!(url, "https://example.com/download.epub");
     }
 
@@ -207,7 +286,93 @@ mod tests {
         "#;
 
         let url = parse_download_url(html).unwrap();
-
         assert_eq!(url, "https://cdn.example.com/file.pdf");
+    }
+
+    #[test]
+    fn parse_download_url_falls_back_to_raw_html_url() {
+        let html = r#"<html><body>https://raw.example.com/file.txt</body></html>"#;
+        let url = parse_download_url(html).unwrap();
+        assert_eq!(url, "https://raw.example.com/file.txt");
+    }
+
+    #[test]
+    fn parse_download_url_no_url_returns_error() {
+        let html = r#"<html><body><p>No URL here</p></body></html>"#;
+        assert!(parse_download_url(html).is_err());
+    }
+
+    #[test]
+    fn parse_download_url_empty_html_returns_error() {
+        assert!(parse_download_url("").is_err());
+    }
+
+    #[test]
+    fn has_search_error_detects_error() {
+        let html = "<html><body>Error during search. Please try again.</body></html>";
+        assert!(has_search_error(html));
+    }
+
+    #[test]
+    fn has_search_error_normal_html() {
+        let html = "<html><body>Results found</body></html>";
+        assert!(!has_search_error(html));
+    }
+
+    #[test]
+    fn has_search_error_empty_html() {
+        assert!(!has_search_error(""));
+    }
+
+    #[test]
+    fn looks_like_download_url_accepts_http() {
+        assert!(looks_like_download_url("http://example.com"));
+        assert!(looks_like_download_url("https://example.com"));
+    }
+
+    #[test]
+    fn looks_like_download_url_rejects_non_http() {
+        assert!(!looks_like_download_url("ftp://example.com"));
+        assert!(!looks_like_download_url("data:text/plain,hello"));
+        assert!(!looks_like_download_url("javascript:alert(1)"));
+        assert!(!looks_like_download_url(""));
+    }
+
+    #[test]
+    fn first_http_url_extracts_terminated_by_whitespace() {
+        let html = "prefix https://example.com/file.epub suffix";
+        assert_eq!(
+            first_http_url(html),
+            Some("https://example.com/file.epub".to_owned())
+        );
+    }
+
+    #[test]
+    fn first_http_url_extracts_terminated_by_quote() {
+        let html = r#"prefix "https://example.com/file.pdf" suffix"#;
+        assert_eq!(
+            first_http_url(html),
+            Some("https://example.com/file.pdf".to_owned())
+        );
+    }
+
+    #[test]
+    fn first_http_url_extracts_terminated_by_angle_bracket() {
+        let html = "prefix https://example.com/file.txt<rest>";
+        assert_eq!(
+            first_http_url(html),
+            Some("https://example.com/file.txt".to_owned())
+        );
+    }
+
+    #[test]
+    fn first_http_url_no_url_returns_none() {
+        assert!(first_http_url("no url here").is_none());
+    }
+
+    #[test]
+    fn first_http_url_prefers_https_over_http() {
+        let html = "http://first.com https://second.com";
+        assert_eq!(first_http_url(html), Some("https://second.com".to_owned()));
     }
 }

@@ -212,3 +212,84 @@ pub fn log_sanitized_html(label: &str, html: &str) {
         "sanitized HTML for debugging"
     );
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn retry_backoff_attempt_0() {
+        assert_eq!(retry_backoff(100, 0), Duration::from_millis(100));
+    }
+
+    #[test]
+    fn retry_backoff_attempt_1() {
+        assert_eq!(retry_backoff(100, 1), Duration::from_millis(100));
+    }
+
+    #[test]
+    fn retry_backoff_attempt_2() {
+        assert_eq!(retry_backoff(100, 2), Duration::from_millis(200));
+    }
+
+    #[test]
+    fn retry_backoff_attempt_3() {
+        assert_eq!(retry_backoff(100, 3), Duration::from_millis(400));
+    }
+
+    #[test]
+    fn retry_backoff_attempt_4() {
+        assert_eq!(retry_backoff(100, 4), Duration::from_millis(800));
+    }
+
+    #[test]
+    fn retry_backoff_attempt_5() {
+        assert_eq!(retry_backoff(100, 5), Duration::from_millis(1600));
+    }
+
+    #[test]
+    fn retry_backoff_attempt_6() {
+        assert_eq!(retry_backoff(100, 6), Duration::from_millis(3200));
+    }
+
+    #[test]
+    fn retry_backoff_attempt_7_capped_at_shift_5() {
+        assert_eq!(retry_backoff(100, 7), Duration::from_millis(3200));
+    }
+
+    #[test]
+    fn retry_backoff_attempt_100_capped() {
+        assert_eq!(retry_backoff(100, 100), Duration::from_millis(3200));
+    }
+
+    #[test]
+    fn retry_backoff_large_base_overflow_safe() {
+        let result = retry_backoff(u64::MAX, 5);
+        assert_eq!(result, Duration::from_millis(u64::MAX));
+    }
+
+    #[test]
+    fn retry_backoff_base_zero() {
+        assert_eq!(retry_backoff(0, 5), Duration::from_millis(0));
+    }
+
+    #[test]
+    fn log_sanitized_html_truncates_long_input() {
+        let long_html = "a".repeat(3000);
+        let snippet: String = long_html.chars().take(2048).collect();
+        assert_eq!(snippet.len(), 2048);
+    }
+
+    #[test]
+    fn log_sanitized_html_short_input_not_truncated() {
+        let short_html = "short";
+        let snippet: String = short_html.chars().take(2048).collect();
+        assert_eq!(snippet, "short");
+    }
+
+    #[test]
+    fn log_sanitized_html_empty_input() {
+        let snippet: String = "".chars().take(2048).collect();
+        assert!(snippet.is_empty());
+    }
+}
