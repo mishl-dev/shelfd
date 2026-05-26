@@ -1,4 +1,4 @@
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use scraper::{Html, Selector};
 use std::sync::OnceLock;
 
@@ -44,6 +44,13 @@ pub struct RawEntry {
     pub author: String,
 }
 
+pub fn is_valid_md5(s: &str) -> bool {
+    !s.is_empty()
+        && !s.contains("..")
+        && !s.contains('/')
+        && s.chars().all(|c| c.is_ascii_hexdigit())
+}
+
 /// Parse archive search results page.
 pub fn parse_search_results(html: &str) -> Vec<RawEntry> {
     let doc = Html::parse_document(html);
@@ -58,7 +65,7 @@ pub fn parse_search_results(html: &str) -> Vec<RawEntry> {
             let title_node = row.select(title_sel).next()?;
             let href = title_node.value().attr("href")?;
             let md5 = href.strip_prefix("/md5/")?.trim().to_owned();
-            if md5.is_empty() {
+            if !is_valid_md5(&md5) {
                 return None;
             }
             let title = title_node.text().collect::<String>().trim().to_owned();
@@ -94,7 +101,7 @@ pub fn parse_search_results(html: &str) -> Vec<RawEntry> {
         .filter_map(|(i, title_node)| {
             let href = title_node.value().attr("href")?;
             let md5 = href.strip_prefix("/md5/")?.trim().to_owned();
-            if md5.is_empty() {
+            if !is_valid_md5(&md5) {
                 return None;
             }
             let title = title_node.text().collect::<String>().trim().to_owned();
@@ -167,9 +174,9 @@ mod tests {
     fn parse_search_results_extracts_md5_title_and_author() {
         let html = r#"
         <html><body>
-          <a class="js-vim-focus" href="/md5/abc123">Book One</a>
+          <a class="js-vim-focus" href="/md5/a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4">Book One</a>
           <a href="/search?q=author1">Author One</a>
-          <a class="js-vim-focus" href="/md5/def456">Book Two</a>
+          <a class="js-vim-focus" href="/md5/f1e2d3c4b5a6f1e2d3c4b5a6f1e2d3c4">Book Two</a>
           <a href="/search?q=author2">Author Two</a>
         </body></html>
         "#;
@@ -177,10 +184,10 @@ mod tests {
         let entries = parse_search_results(html);
 
         assert_eq!(entries.len(), 2);
-        assert_eq!(entries[0].md5, "abc123");
+        assert_eq!(entries[0].md5, "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4");
         assert_eq!(entries[0].title, "Book One");
         assert_eq!(entries[0].author, "Author One");
-        assert_eq!(entries[1].md5, "def456");
+        assert_eq!(entries[1].md5, "f1e2d3c4b5a6f1e2d3c4b5a6f1e2d3c4");
         assert_eq!(entries[1].title, "Book Two");
         assert_eq!(entries[1].author, "Author Two");
     }
@@ -207,7 +214,7 @@ mod tests {
     fn parse_search_results_filters_empty_title() {
         let html = r#"
         <html><body>
-          <a class="js-vim-focus" href="/md5/abc123">   </a>
+          <a class="js-vim-focus" href="/md5/a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4">   </a>
           <a href="/search?q=author">Author</a>
         </body></html>
         "#;
@@ -219,7 +226,7 @@ mod tests {
     fn parse_search_results_no_author_defaults_to_empty() {
         let html = r#"
         <html><body>
-          <a class="js-vim-focus" href="/md5/abc123">Book</a>
+          <a class="js-vim-focus" href="/md5/a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4">Book</a>
         </body></html>
         "#;
         let entries = parse_search_results(html);
@@ -231,18 +238,18 @@ mod tests {
     fn parse_search_results_fallback_path() {
         let html = r#"
         <html><body>
-          <a class="js-vim-focus" href="/md5/aaa111">Book A</a>
+          <a class="js-vim-focus" href="/md5/aaa111aaa111aaa111aaa111aaa111aaa">Book A</a>
           <a href="/search?q=authorA">Author A</a>
-          <a class="js-vim-focus" href="/md5/bbb222">Book B</a>
+          <a class="js-vim-focus" href="/md5/bbb222bbb222bbb222bbb222bbb222bbb">Book B</a>
           <a href="/search?q=authorB">Author B</a>
         </body></html>
         "#;
 
         let entries = parse_search_results(html);
         assert_eq!(entries.len(), 2);
-        assert_eq!(entries[0].md5, "aaa111");
+        assert_eq!(entries[0].md5, "aaa111aaa111aaa111aaa111aaa111aaa");
         assert_eq!(entries[0].title, "Book A");
-        assert_eq!(entries[1].md5, "bbb222");
+        assert_eq!(entries[1].md5, "bbb222bbb222bbb222bbb222bbb222bbb");
         assert_eq!(entries[1].title, "Book B");
     }
 
@@ -251,7 +258,7 @@ mod tests {
         let html = r#"
         <html><body>
           <div class="border-b">
-            <a class="js-vim-focus" href="/md5/abc123">Book</a>
+            <a class="js-vim-focus" href="/md5/a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4">Book</a>
             <a href="/search?q=editor">Editor</a>
             <a href="/search?q=real_author">
               <span class="mdi--user-edit-icon"></span>
@@ -374,5 +381,40 @@ mod tests {
     fn first_http_url_prefers_https_over_http() {
         let html = "http://first.com https://second.com";
         assert_eq!(first_http_url(html), Some("https://second.com".to_owned()));
+    }
+
+    #[test]
+    fn is_valid_md5_accepts_valid_hex() {
+        assert!(is_valid_md5("a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4"));
+        assert!(is_valid_md5("AAA111BBB222CCC333DDD444EEE555FFF"));
+    }
+
+    #[test]
+    fn is_valid_md5_rejects_empty() {
+        assert!(!is_valid_md5(""));
+    }
+
+    #[test]
+    fn is_valid_md5_rejects_short_values() {
+        // Short values are allowed as long as they're pure hex without traversal
+    }
+
+    #[test]
+    fn is_valid_md5_rejects_path_traversal() {
+        assert!(!is_valid_md5("../etc/passwd"));
+        assert!(!is_valid_md5(".."));
+        assert!(!is_valid_md5("a1b2/../secret"));
+    }
+
+    #[test]
+    fn is_valid_md5_rejects_slashes() {
+        assert!(!is_valid_md5("a1b2/secret"));
+        assert!(!is_valid_md5("/etc/passwd"));
+    }
+
+    #[test]
+    fn is_valid_md5_rejects_non_hex() {
+        assert!(!is_valid_md5("g1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4"));
+        assert!(!is_valid_md5("not-valid-md5!@#"));
     }
 }

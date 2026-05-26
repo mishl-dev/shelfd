@@ -13,6 +13,9 @@ use crate::service::download::resolve_download;
 
 #[instrument(skip(state), fields(md5 = %md5))]
 pub async fn handle_download(State(state): State<AppState>, Path(md5): Path<String>) -> Response {
+    if !crate::scraper::is_valid_md5(&md5) {
+        return (StatusCode::BAD_REQUEST, "invalid md5 format").into_response();
+    }
     state.metrics.requests_total.fetch_add(1, Ordering::Relaxed);
     state
         .metrics
