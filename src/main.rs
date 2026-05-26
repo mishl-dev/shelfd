@@ -333,17 +333,17 @@ mod tests {
 
     #[test]
     fn retry_backoff_grows_exponentially() {
-        assert_eq!(
-            retry_backoff(250, 1),
-            tokio::time::Duration::from_millis(250)
-        );
-        assert_eq!(
-            retry_backoff(250, 2),
-            tokio::time::Duration::from_millis(500)
-        );
-        assert_eq!(
-            retry_backoff(250, 3),
-            tokio::time::Duration::from_millis(1000)
-        );
+        for _ in 0..10 {
+            let d1 = retry_backoff(250, 1);
+            assert!(d1.as_millis() >= 125 && d1.as_millis() <= 250);
+        }
+        for _ in 0..10 {
+            let d2 = retry_backoff(250, 2);
+            assert!(d2.as_millis() >= 250 && d2.as_millis() <= 500);
+        }
+        for _ in 0..10 {
+            let d3 = retry_backoff(250, 3);
+            assert!(d3.as_millis() >= 500 && d3.as_millis() <= 1000);
+        }
     }
 }

@@ -1,24 +1,23 @@
 use anyhow::Context;
-use backoff::ExponentialBackoffBuilder;
-use backoff::backoff::Backoff;
+use rand::RngExt;
 use std::sync::atomic::Ordering;
 use tokio::time::{Duration, sleep};
 use tracing::{debug, trace, warn};
 
 use crate::state::AppState;
 
-fn make_backoff(state: &AppState) -> backoff::ExponentialBackoff {
-    ExponentialBackoffBuilder::new()
-        .with_initial_interval(Duration::from_millis(state.upstream_retry_backoff_ms))
-        .with_multiplier(2.0)
-        .with_max_elapsed_time(None)
-        .build()
+const MAX_BACKOFF_MS: u64 = 30_000;
+
+pub fn retry_backoff(base_ms: u64, attempt: usize) -> Duration {
+    let base = base_ms.min(MAX_BACKOFF_MS);
+    let multiplier = 1_u64 << attempt.saturating_sub(1).min(5);
+    let shifted = base.saturating_mul(multiplier).min(MAX_BACKOFF_MS);
+    let jitter: u64 = rand::rng().random_range(0..=shifted);
+    Duration::from_millis(shifted.wrapping_add(jitter) / 2)
 }
 
-#[cfg_attr(not(test), allow(dead_code))]
-pub fn retry_backoff(base_ms: u64, attempt: usize) -> Duration {
-    let multiplier = 1_u64 << attempt.saturating_sub(1).min(5);
-    Duration::from_millis(base_ms.saturating_mul(multiplier))
+fn make_backoff(initial_ms: u64) -> impl FnMut(usize) -> Duration {
+    move |attempt| retry_backoff(initial_ms, attempt)
 }
 
 pub async fn get_text_raced(
@@ -72,7 +71,7 @@ pub async fn get_text_with_retry(
     label: &'static str,
 ) -> anyhow::Result<String> {
     let attempts = state.upstream_retry_attempts.max(1);
-    let mut backoff = make_backoff(state);
+    let mut backoff = make_backoff(state.upstream_retry_backoff_ms);
     let mut last_error = None;
 
     trace!(attempts, "starting upstream text retries");
@@ -98,7 +97,8 @@ pub async fn get_text_with_retry(
             }
         }
 
-        if let Some(duration) = backoff.next_backoff() {
+        if attempt < attempts {
+            let duration = backoff(attempt);
             state
                 .metrics
                 .upstream_retries
@@ -125,7 +125,7 @@ where
     T: serde::de::DeserializeOwned,
 {
     let attempts = state.upstream_retry_attempts.max(1);
-    let mut backoff = make_backoff(state);
+    let mut backoff = make_backoff(state.upstream_retry_backoff_ms);
     let mut last_error = None;
 
     trace!(attempts, "starting upstream json retries");
@@ -153,7 +153,8 @@ where
             }
         }
 
-        if let Some(duration) = backoff.next_backoff() {
+        if attempt < attempts {
+            let duration = backoff(attempt);
             state
                 .metrics
                 .upstream_retries
@@ -176,7 +177,7 @@ pub async fn get_flaresolverr_html_with_retry(
     url: &str,
 ) -> anyhow::Result<String> {
     let attempts = state.upstream_retry_attempts.max(1);
-    let mut backoff = make_backoff(state);
+    let mut backoff = make_backoff(state.upstream_retry_backoff_ms);
     let mut last_error = None;
 
     for attempt in 1..=attempts {
@@ -185,7 +186,8 @@ pub async fn get_flaresolverr_html_with_retry(
             Err(error) => last_error = Some(error),
         }
 
-        if let Some(duration) = backoff.next_backoff() {
+        if attempt < attempts {
+            let duration = backoff(attempt);
             state
                 .metrics
                 .upstream_retries
@@ -219,58 +221,75 @@ mod tests {
 
     #[test]
     fn retry_backoff_attempt_0() {
-        assert_eq!(retry_backoff(100, 0), Duration::from_millis(100));
+        for _ in 0..10 {
+            let result = retry_backoff(100, 0);
+            assert!(result.as_millis() >= 50 && result.as_millis() <= 100);
+        }
     }
 
     #[test]
     fn retry_backoff_attempt_1() {
-        assert_eq!(retry_backoff(100, 1), Duration::from_millis(100));
+        let result = retry_backoff(100, 1);
+        assert!(result.as_millis() >= 50 && result.as_millis() <= 100);
     }
 
     #[test]
     fn retry_backoff_attempt_2() {
-        assert_eq!(retry_backoff(100, 2), Duration::from_millis(200));
+        let result = retry_backoff(100, 2);
+        assert!(result.as_millis() >= 100 && result.as_millis() <= 200);
     }
 
     #[test]
     fn retry_backoff_attempt_3() {
-        assert_eq!(retry_backoff(100, 3), Duration::from_millis(400));
+        let result = retry_backoff(100, 3);
+        assert!(result.as_millis() >= 200 && result.as_millis() <= 400);
     }
 
     #[test]
     fn retry_backoff_attempt_4() {
-        assert_eq!(retry_backoff(100, 4), Duration::from_millis(800));
+        let result = retry_backoff(100, 4);
+        assert!(result.as_millis() >= 400 && result.as_millis() <= 800);
     }
 
     #[test]
     fn retry_backoff_attempt_5() {
-        assert_eq!(retry_backoff(100, 5), Duration::from_millis(1600));
+        let result = retry_backoff(100, 5);
+        assert!(result.as_millis() >= 800 && result.as_millis() <= 1600);
     }
 
     #[test]
     fn retry_backoff_attempt_6() {
-        assert_eq!(retry_backoff(100, 6), Duration::from_millis(3200));
+        let result = retry_backoff(100, 6);
+        assert!(result.as_millis() >= 1600 && result.as_millis() <= 3200);
     }
 
     #[test]
     fn retry_backoff_attempt_7_capped_at_shift_5() {
-        assert_eq!(retry_backoff(100, 7), Duration::from_millis(3200));
+        let result = retry_backoff(100, 7);
+        assert!(result.as_millis() >= 1600 && result.as_millis() <= 3200);
     }
 
     #[test]
     fn retry_backoff_attempt_100_capped() {
-        assert_eq!(retry_backoff(100, 100), Duration::from_millis(3200));
+        let result = retry_backoff(100, 100);
+        assert!(result.as_millis() >= 1600 && result.as_millis() <= 3200);
     }
 
     #[test]
     fn retry_backoff_large_base_overflow_safe() {
         let result = retry_backoff(u64::MAX, 5);
-        assert_eq!(result, Duration::from_millis(u64::MAX));
+        assert!(result.as_millis() > 0);
     }
 
     #[test]
     fn retry_backoff_base_zero() {
         assert_eq!(retry_backoff(0, 5), Duration::from_millis(0));
+    }
+
+    #[test]
+    fn retry_backoff_respects_max_cap() {
+        let result = retry_backoff(100_000, 0);
+        assert!(result.as_millis() <= MAX_BACKOFF_MS as u128);
     }
 
     #[test]
