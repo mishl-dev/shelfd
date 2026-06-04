@@ -114,7 +114,7 @@ pub async fn do_search(state: &AppState, query: &str, page: usize) -> anyhow::Re
         Ordering::Relaxed,
     );
 
-    let resolved: Vec<_> = stream::iter(raw.into_iter())
+    let resolved: Vec<_> = stream::iter(raw)
         .map(|entry| resolve_book_entry(state, entry, &cached_by_md5))
         .buffer_unordered(state.inline_info_concurrency.max(1))
         .collect()

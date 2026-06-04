@@ -18,7 +18,7 @@ resvg = "0.47"
 scraper = "0.26.0"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.149"
-sqlx = { version = "0.8.6", features = ["sqlite", "runtime-tokio", "macros"] }
+sqlx = { version = "0.8.6", features = ["sqlite", "runtime-tokio", "macros"], default-features = false }
 tiny-skia = "0.12"
 tokio = { version = "1.50.0", features = ["full"] }
 toml = "1.1"
