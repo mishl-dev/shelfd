@@ -12,6 +12,12 @@
    just up
    ```
 
+   Or without `just`:
+
+   ```bash
+   docker compose up --build
+   ```
+
 3. Open your ebook reader (e.g. [Foliate](https://johnfactotum.github.io/foliate/)) and add the OPDS feed:
 
    ```
