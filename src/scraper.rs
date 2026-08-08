@@ -1,6 +1,16 @@
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use scraper::{Html, Selector};
 use std::sync::OnceLock;
+
+/// Selects the search results list container on the archive page.
+///
+/// The archive wraps its result rows in `div.js-aarecord-list-outer`.
+/// Scoping rows to this container (when present) keeps the parser from
+/// treating arbitrary `div.border-b` blocks elsewhere on the page as rows.
+fn results_container_sel() -> &'static Selector {
+    static SEL: OnceLock<Selector> = OnceLock::new();
+    SEL.get_or_init(|| Selector::parse("div.js-aarecord-list-outer").unwrap())
+}
 
 fn row_sel() -> &'static Selector {
     static SEL: OnceLock<Selector> = OnceLock::new();
@@ -17,9 +27,12 @@ fn author_sel() -> &'static Selector {
     SEL.get_or_init(|| Selector::parse("a[href*='search?q=']").unwrap())
 }
 
+/// The editor/author marker icon. The archive renders it as
+/// `icon-[mdi--user-edit]` (was `mdi--user-edit`), so match the
+/// stable `user-edit` fragment instead of the icon-set prefix.
 fn user_icon_sel() -> &'static Selector {
     static SEL: OnceLock<Selector> = OnceLock::new();
-    SEL.get_or_init(|| Selector::parse("span[class*='mdi--user-edit']").unwrap())
+    SEL.get_or_init(|| Selector::parse("span[class*='user-edit']").unwrap())
 }
 
 fn span_break_all_sel() -> &'static Selector {
@@ -59,8 +72,20 @@ pub fn parse_search_results(html: &str) -> Vec<RawEntry> {
     let author_sel = author_sel();
     let user_icon_sel = user_icon_sel();
 
-    let entries: Vec<_> = doc
-        .select(row_sel)
+    let rows: Vec<_> = match doc.select(results_container_sel()).next() {
+        Some(container) => {
+            let scoped: Vec<_> = container.select(row_sel).collect();
+            if !scoped.is_empty() {
+                scoped
+            } else {
+                doc.select(row_sel).collect()
+            }
+        }
+        None => doc.select(row_sel).collect(),
+    };
+
+    let entries: Vec<_> = rows
+        .into_iter()
         .filter_map(|row| {
             let title_node = row.select(title_sel).next()?;
             let href = title_node.value().attr("href")?;
@@ -174,10 +199,16 @@ mod tests {
     fn parse_search_results_extracts_md5_title_and_author() {
         let html = r#"
         <html><body>
-          <a class="js-vim-focus" href="/md5/a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4">Book One</a>
-          <a href="/search?q=author1">Author One</a>
-          <a class="js-vim-focus" href="/md5/f1e2d3c4b5a6f1e2d3c4b5a6f1e2d3c4">Book Two</a>
-          <a href="/search?q=author2">Author Two</a>
+          <div class="js-aarecord-list-outer">
+            <div class="border-b">
+              <a class="js-vim-focus" href="/md5/a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4">Book One</a>
+              <a href="/search?q=author1">Author One</a>
+            </div>
+            <div class="border-b">
+              <a class="js-vim-focus" href="/md5/f1e2d3c4b5a6f1e2d3c4b5a6f1e2d3c4">Book Two</a>
+              <a href="/search?q=author2">Author Two</a>
+            </div>
+          </div>
         </body></html>
         "#;
 
@@ -257,13 +288,15 @@ mod tests {
     fn parse_search_results_prefers_author_with_user_icon() {
         let html = r#"
         <html><body>
-          <div class="border-b">
-            <a class="js-vim-focus" href="/md5/a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4">Book</a>
-            <a href="/search?q=editor">Editor</a>
-            <a href="/search?q=real_author">
-              <span class="mdi--user-edit-icon"></span>
-              Real Author
-            </a>
+          <div class="js-aarecord-list-outer">
+            <div class="border-b">
+              <a class="js-vim-focus" href="/md5/a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4">Book</a>
+              <a href="/search?q=editor">Editor</a>
+              <a href="/search?q=real_author">
+                <span class="icon-[mdi--user-edit] text-base align-sub"></span>
+                Real Author
+              </a>
+            </div>
           </div>
         </body></html>
         "#;
